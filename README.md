@@ -1,5 +1,34 @@
 # Automatización Web con FastAPI y Selenium vs UiPath
 
+## Instrucciones de despliegue
+
+### Con Docker Compose (recomendado)
+
+1. Clona este repositorio:
+```bash
+git clone https://github.com/Sxrg1o/scrapper-dp2.git
+cd scrapper-dp2
+```
+
+2. Construye y ejecuta la aplicación con Docker Compose:
+```bash
+docker compose up -d
+```
+
+3. La aplicación estará disponible en http://localhost:8000
+
+### Con Docker (manual)
+
+1. Construye la imagen:
+```bash
+docker build -t scrapper-dp2 .
+```
+
+2. Ejecuta el contenedor:
+```bash
+docker run -p 8000:8000 --name scrapper-dp2 scrapper-dp2
+```
+
 ## ¿Por qué elegir esta solución sobre UiPath?
 
 ### 1. Costos y Accesibilidad

@@ -35,15 +35,23 @@ def login_submit(request: Request, username: str = Form(...), password: str = Fo
 async def run_selenium_test():
     """Ejecuta el test de Selenium y retorna el resultado"""
     try:
+        # Configurar opciones para Chrome en entorno Docker
+        chrome_options = webdriver.ChromeOptions()
+        chrome_options.add_argument('--headless')
+        chrome_options.add_argument('--disable-gpu')
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        
         # Configurar el driver de Chrome usando webdriver_manager
         service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service)
+        driver = webdriver.Chrome(service=service, options=chrome_options)
         result = {"status": "success", "steps": []}
         
         try:
             # Abrir la página de login
             result["steps"].append("Abriendo página de login...")
-            driver.get("http://127.0.0.1:9000/login")
+            # Usar el host localhost para Docker
+            driver.get("http://localhost:8000/login")
             sleep(2)
 
             # Ingresar usuario
