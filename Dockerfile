@@ -56,6 +56,10 @@ RUN conda create --name app-env --file requirements.txt -c conda-forge -c defaul
 # Configurar Chrome para ejecutarse sin sandbox
 ENV CHROME_OPTIONS="--headless --disable-gpu --no-sandbox --disable-dev-shm-usage"
 
+# Crear carpeta static si no existe
+RUN mkdir -p static
+RUN mkdir -p /app/static
+
 # Exponer el puerto para la aplicación FastAPI
 EXPOSE 8000
 
