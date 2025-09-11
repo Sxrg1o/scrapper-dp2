@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # FastAPI Little Caesars Menu API
 
 Este proyecto es una API construida con FastAPI que expone un endpoint `/PizzasLitleCesar` para obtener el menú de Little Caesars Perú. Incluye documentación Swagger por defecto.
@@ -20,3 +21,6 @@ Este proyecto es una API construida con FastAPI que expone un endpoint `/PizzasL
 
 ## Endpoint
 - `GET /PizzasLitleCesar`: Devuelve el menú de Little Caesars Perú (nombre, precio y descripción de cada ítem).
+=======
+# scrapper-dp2
+>>>>>>> 8b3d64de767c9e2a51dcfecc4971fb8ecfdca940
