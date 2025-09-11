@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run FastAPI server",
+			"type": "shell",
+			"command": "C:/Users/Windows/Downloads/Automatizaciones/.venv/Scripts/python.exe -m uvicorn main:app --reload",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
+		}
+	]
+}
