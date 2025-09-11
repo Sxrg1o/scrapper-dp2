@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Automatización Web con FastAPI y Selenium vs UiPath
 
 ## ¿Por qué elegir esta solución sobre UiPath?
@@ -83,6 +82,3 @@ Para una automatización web como esta, la combinación de FastAPI y Selenium of
    - API docs: http://localhost:8000/docs
    - Login: http://localhost:8000/login
    - Menú: http://localhost:8000/PizzasLitleCesar
-=======
-# scrapper-dp2
->>>>>>> 8b3d64de767c9e2a51dcfecc4971fb8ecfdca940
