@@ -153,7 +153,8 @@ def fetch_menu() -> List[Dict[str, str]]:
                     menu_items.append({
                         "name": str(obj["name"]).strip(),
                         "price": str(obj["price"]).strip(),
-                        "description": str(obj["description"]).strip()
+                        "description": str(obj["description"]).strip(),
+                        "image": str(obj["image"]).strip()
                     })
                 else:
                     for v in obj.values():
