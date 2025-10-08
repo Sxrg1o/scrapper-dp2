@@ -33,18 +33,6 @@ interface MesaDomotica {
 }
 ```
 
-### `ResponseJson`
-
-Es la estructura estándar de respuesta para todas las llamadas a la API REST.
-
-```typescript
-interface ResponseJson {
-  error: null | string; // Contiene un mensaje de error si la petición falló, de lo contrario es `null`.
-  status: number;       // El código de estado HTTP de la respuesta.
-  data: any;            // Los datos solicitados. Puede ser un objeto, un array de objetos o `null`.
-}
-```
-
 -----
 
 ## **Endpoints de la API REST**
@@ -68,75 +56,6 @@ Este endpoint se utiliza para verificar el estado y la disponibilidad del servic
         "status": "online",
         "timestamp": "2025-10-05T18:56:29Z"
       }
-    }
-    ```
-
------
-
-### **Gestión de Platos**
-
-#### `GET /api/v1/platos`
-
-Obtiene una lista de todos los platos disponibles. Permite filtrar los resultados por categoría.
-
-  - **Método:** `GET`
-  - **Parámetros de Query:**
-      - `category` (opcional): `string` - Filtra los platos por la categoría especificada.
-  - **Respuesta Exitosa (200 OK):**
-    ```json
-    {
-      "error": null,
-      "status": 200,
-      "data": [
-        {
-          "categoria": "Entradas",
-          "nombre": "Ceviche Clásico",
-          "stock": 15,
-          "precio": 35.50
-        },
-        {
-          "categoria": "Platos Fuertes",
-          "nombre": "Lomo Saltado",
-          "stock": 25,
-          "precio": 48.00
-        }
-      ]
-    }
-    ```
-  - **Respuesta de Error (502 Bad Gateway):**
-    ```json
-    {
-      "error": "No se pudo obtener la información en este momento. Por favor, inténtelo de nuevo más tarde.",
-      "status": 502,
-      "data": null
-    }
-    ```
-
-### **Gestión de Mesas**
-
-#### `GET /api/v1/mesas`
-
-Recupera el estado actual de todas las mesas del restaurante.
-
-  - **Método:** `GET`
-  - **Parámetros:** Ninguno.
-  - **Respuesta Exitosa (200 OK):**
-    ```json
-    {
-      "error": null,
-      "status": 200,
-      "data": [
-        {
-          "identificador": "MESA-01",
-          "zona": "Terraza",
-          "ocupado": false
-        },
-        {
-          "identificador": "MESA-02",
-          "zona": "Salón Principal",
-          "ocupado": true
-        }
-      ]
     }
     ```
 
