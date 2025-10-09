@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     domotica_scrape_interval: int = (
         300  # Intervalo de actualización en segundos (5 minutos)
     )
+    
+    # API Configuration
+    api_base_url: str
+    api_key: str = ""  # Clave API para autenticación
+    api_timeout: int = 30  # Timeout para llamadas API en segundos
 
     # CORS
     allowed_origins: str = "*"
@@ -110,6 +115,7 @@ def get_settings() -> Settings:
     global _settings_instance
     if _settings_instance is None:
         _settings_instance = Settings(
+            api_base_url=os.getenv("API_BASE_URL", "http://localhost:8000"),
             domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://domotica-peru.com/"),
             domotica_username=os.getenv("DOMOTICA_USERNAME", "meseroeder"),
             domotica_password=os.getenv("DOMOTICA_PASSWORD", "1234eder"),
