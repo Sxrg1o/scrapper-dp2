@@ -13,30 +13,6 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Instalar Chrome (Método moderno y corregido)
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
-    && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
-# Configurar Chrome para ejecutarse sin sandbox (necesario para Docker)
-ENV CHROME_OPTIONS="--headless --disable-gpu --no-sandbox --disable-dev-shm-usage"
-
-# Copiar los archivos del proyecto
-COPY . .
-
-# 1. Usar una imagen base que ya contenga Miniconda
-FROM continuumio/miniconda3
-
-# Instalar dependencias del sistema para Chrome
-# La imagen de miniconda está basada en Debian, por lo que apt-get funciona
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    --no-install-recommends \
-    && rm -rf /var/lib/apt/lists/*
-
 # Instalar Chrome (Método moderno)
 RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-chrome.gpg \
     && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list \
@@ -44,24 +20,31 @@ RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --d
     && apt-get install -y google-chrome-stable --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Establecer el directorio de trabajo
-WORKDIR /app
+# Instalar chromedriver
+RUN CHROME_VERSION=$(google-chrome --version | awk '{ print $3 }' | cut -d '.' -f 1) \
+    && CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION") \
+    && wget -q "https://chromedriver.storage.googleapis.com/$CHROMEDRIVER_VERSION/chromedriver_linux64.zip" \
+    && unzip chromedriver_linux64.zip -d /usr/local/bin \
+    && rm chromedriver_linux64.zip \
+    && chmod +x /usr/local/bin/chromedriver
 
-# 2. Copiar solo el archivo de dependencias primero para aprovechar el caché de Docker
-COPY . .
-
-# 3. Crear el entorno de Conda usando tu archivo
-RUN conda create --name app-env --file requirements.txt -c conda-forge -c defaults
-
-# Configurar Chrome para ejecutarse sin sandbox
+# Configurar Chrome para ejecutarse sin sandbox (necesario para Docker)
 ENV CHROME_OPTIONS="--headless --disable-gpu --no-sandbox --disable-dev-shm-usage"
+
+# Copiar requirements.txt primero para aprovechar el caché de Docker
+COPY requirements.txt .
+
+# Instalar dependencias de Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar el resto del código fuente
+COPY . .
 
 # Crear carpeta static si no existe
 RUN mkdir -p static
-RUN mkdir -p /app/static
 
 # Exponer el puerto para la aplicación FastAPI
 EXPOSE 8000
 
-# 4. Comando para ejecutar la aplicación DENTRO del entorno de Conda
-CMD ["conda", "run", "-n", "app-env", "--no-capture-output", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando para ejecutar la aplicación con uvicorn
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
