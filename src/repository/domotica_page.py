@@ -460,7 +460,7 @@ class DomoticaPage:
             return False
 
     def scrap_platos(self) -> List[ProductoDomotica]:
-        pass
+        return []
     
     def close(self) -> None:
         """
