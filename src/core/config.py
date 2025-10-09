@@ -108,7 +108,7 @@ def get_settings() -> Settings:
     Esta función garantiza que solo exista una instancia de Settings
     en toda la aplicación, evitando cargar múltiples veces las
     configuraciones desde el entorno.
-    
+
     Las configuraciones se cargan automáticamente desde:
     1. Archivo .env (si existe)
     2. Variables de entorno del sistema
@@ -121,10 +121,5 @@ def get_settings() -> Settings:
     """
     global _settings_instance
     if _settings_instance is None:
-        _settings_instance = Settings(
-            api_base_url=os.getenv("API_BASE_URL", "http://localhost:8000"),
-            domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://domotica.pe"),
-            domotica_username=os.getenv("DOMOTICA_USERNAME", "your-username"),
-            domotica_password=os.getenv("DOMOTICA_PASSWORD", "your-password"),
-        )
+        _settings_instance = Settings()
     return _settings_instance
