@@ -78,8 +78,7 @@ class DomoticaPage:
 
         # Opciones recomendadas para scraping
         if not settings.debug:
-            # chrome_options.add_argument("--headless")
-            pass
+            chrome_options.add_argument("--headless")
 
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
