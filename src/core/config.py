@@ -3,8 +3,14 @@ Configuración de la aplicación Domotica Scrapper.
 """
 
 import os
+from pathlib import Path
 from typing import Optional, ClassVar
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Obtener el directorio raíz del proyecto (donde está el .env)
+# src/core/config.py -> src -> scrapper-dp2
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
@@ -28,7 +34,7 @@ class Settings(BaseSettings):
 
     # Model configuration
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
-        env_file=".env", case_sensitive=False, env_prefix="", extra="ignore"
+        env_file=str(ENV_FILE), case_sensitive=False, env_prefix="", extra="ignore"
     )
 
     # Application info
@@ -51,9 +57,9 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
 
     # Domotica INC Scraping
-    domotica_base_url: str = "https://domotica-peru.com/"
-    domotica_username: str = ""
-    domotica_password: str = ""
+    domotica_base_url: str
+    domotica_username: str
+    domotica_password: str
     domotica_timeout: int = 30  # Timeout en segundos
     domotica_scrape_interval: int = (
         300  # Intervalo de actualización en segundos (5 minutos)

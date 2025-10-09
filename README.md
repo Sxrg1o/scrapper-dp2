@@ -65,7 +65,7 @@ DOMOTICA_PASSWORD=tu_contraseña
 SECRET_KEY=tu-clave-secreta-aqui
 ```
 
-> **Nota**: Las credenciales por defecto (`USUARIO` / `CONTRASEÑA`) están configuradas en el archivo `.env`. 
+> **Nota**: Las credenciales por defecto (`USUARIO` / `CONTRASEÑA`) están configuradas en el archivo `.env`.    
 > Puedes modificarlas directamente en `.env` o establecer variables de entorno en tu sistema.
 
 **Prioridad de carga de configuración:**
