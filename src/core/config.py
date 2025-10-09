@@ -44,19 +44,21 @@ class Settings(BaseSettings):
     # Server configuration
     host: str = "0.0.0.0"
     port: int = 8000
-    
+
     # Security
     secret_key: str
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
-    
+
     # Domotica INC Scraping
-    domotica_base_url: str = "http://domotica-inc.example.com"
-    domotica_username: str = "MESEROEDER"  # Usuario por defecto
-    domotica_password: str = ""  # Sin valor por defecto por seguridad
+    domotica_base_url: str
+    domotica_username: str
+    domotica_password: str
     domotica_timeout: int = 30  # Timeout en segundos
-    domotica_scrape_interval: int = 300  # Intervalo de actualización en segundos (5 minutos)
+    domotica_scrape_interval: int = (
+        300  # Intervalo de actualización en segundos (5 minutos)
+    )
 
     # CORS
     allowed_origins: List[str] = ["http://localhost:3000"]
@@ -139,6 +141,9 @@ def get_settings() -> Settings:
     global _settings_instance
     if _settings_instance is None:
         _settings_instance = Settings(
+            domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://example.com/"),
+            domotica_username=os.getenv("DOMOTICA_USERNAME", "your_username"),
+            domotica_password=os.getenv("DOMOTICA_PASSWORD", "your_password"),
             secret_key=os.getenv("SECRET_KEY", "your-default-secret-key"),
         )
     return _settings_instance
