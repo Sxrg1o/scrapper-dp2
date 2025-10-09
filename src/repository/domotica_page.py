@@ -460,7 +460,370 @@ class DomoticaPage:
             return False
 
     def scrap_platos(self) -> List[ProductoDomotica]:
-        pass
+        """
+        Extrae la lista de productos/platos disponibles en la plataforma.
+        
+        Este método debe ser llamado después de navegar a la vista de una mesa
+        y obtener acceso al catálogo de productos.
+        
+        Returns
+        -------
+        List[ProductoDomotica]
+            Lista de objetos ProductoDomotica con la información extraída.
+        """
+        logger.info("Método scrap_platos no implementado completamente")
+        return []
+    
+    def go_to_tables(self) -> str:
+        """
+        Navega a la sección de mesas haciendo clic en el card de 'Mesas'.
+        
+        Returns
+        -------
+        str
+            Estado de la operación: "tables_clicked" si es exitoso, o mensaje de error.
+        """
+        try:
+            go_to_tables_btn = WebDriverWait(self.driver, self.timeout).until(
+                EC.element_to_be_clickable((By.XPATH, '//h4[contains(@class, "text-center") and contains(@class, "pa-1") and text()="Mesas"]'))
+            )
+            go_to_tables_btn.click()
+            logger.info("Navegación a mesas exitosa")
+            return "tables_clicked"
+        except Exception as go_to_tables_err:
+            error_msg = f"tables_error: {go_to_tables_err}"
+            logger.error(error_msg)
+            return error_msg
+
+    def get_only_mesas(self) -> dict:
+        """
+        Extrae SOLO la información de las mesas desde 'Gestionar Mesas'.
+        
+        Este método es más ligero que get_full_category ya que solo extrae mesas
+        sin navegar por las categorías de productos.
+        
+        Returns
+        -------
+        dict
+            Diccionario con las siguientes claves:
+            - mesas: Lista de mesas extraídas
+            - mesas_error: Mensaje de error si hubo problemas
+            - status: Estado de la operación
+            - elapsed_seconds: Tiempo transcurrido
+        """
+        import time
+        start_time = time.time()
+        mesas = []
+        mesas_error = None
+        
+        try:
+            # Extraer información de mesas desde el botón OPCIONES
+            opciones_btn = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, '//button[.//span[contains(text(), "OPCIONES")]]'))
+            )
+            opciones_btn.click()
+            logger.debug("Botón OPCIONES clickeado")
+            
+            # Hacer clic en 'Gestionar Mesas'
+            gestionar_mesas_btn = WebDriverWait(self.driver, 10).until(
+                EC.element_to_be_clickable((By.XPATH, '//div[contains(@class, "v-list-item__title") and contains(text(), "Gestionar Mesas")]'))
+            )
+            gestionar_mesas_btn.click()
+            logger.debug("Gestionar Mesas clickeado")
+            
+            # Esperar a que aparezca la tabla de mesas
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "v-data-table__wrapper")]/table'))
+            )
+            
+            mesa_rows = self.driver.find_elements(By.XPATH, '//div[contains(@class, "v-data-table__wrapper")]/table/tbody/tr')
+            logger.debug(f"Encontradas {len(mesa_rows)} filas de mesas")
+            
+            for row in mesa_rows:
+                cols = row.find_elements(By.XPATH, './td')
+                if len(cols) >= 4:
+                    nombre = cols[0].text
+                    zona = cols[1].text
+                    nota = cols[2].text
+                    mesas.append({"nombre": nombre, "zona": zona, "nota": nota})
+            
+            logger.info(f"Extraídas {len(mesas)} mesas")
+            
+            # Cerrar el modal de gestionar mesas
+            try:
+                close_btn = WebDriverWait(self.driver, 5).until(
+                    EC.element_to_be_clickable((By.XPATH, '//div[contains(@class, "v-system-bar") and contains(@class, "v-system-bar--window") and contains(@class, "theme--dark")]/button[contains(@class, "v-icon") and contains(@class, "mdi-close") and contains(@class, "theme--dark")]'))
+                )
+                close_btn.click()
+                logger.debug("Modal de mesas cerrado")
+            except Exception as close_err:
+                elapsed = time.time() - start_time
+                logger.error(f"Error al cerrar modal: {close_err}")
+                return {"mesas": mesas, "mesas_error": f"close_x_error: {close_err}", "status": "close_error", "elapsed_seconds": elapsed}
+            
+            elapsed = time.time() - start_time
+            logger.info(f"Extracción de mesas completada en {elapsed:.2f} segundos")
+            return {"mesas": mesas, "mesas_error": mesas_error, "status": "mesas_obtained", "elapsed_seconds": elapsed}
+                
+        except Exception as mesas_err:
+            mesas_error = str(mesas_err)
+            elapsed = time.time() - start_time
+            logger.error(f"Error extrayendo mesas: {mesas_error}")
+            return {"mesas": mesas, "mesas_error": mesas_error, "status": f"mesas_error: {mesas_error}", "elapsed_seconds": elapsed}
+
+    def get_only_products(self) -> dict:
+        """
+        Extrae SOLO los productos de todas las categorías.
+        
+        Este método es más ligero que get_full_category ya que no extrae
+        información de mesas.
+        
+        Returns
+        -------
+        dict
+            Diccionario con las siguientes claves:
+            - category: Lista de categorías con sus productos
+            - status: Estado de la operación
+            - elapsed_seconds: Tiempo transcurrido
+        """
+        import time
+        start_time = time.time()
+        menu_data = []
+        
+        try:
+            # Hacer clic en el primer card de categoría para acceder al menú
+            try:
+                first_card = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, '(//div[contains(@class, "v-card v-card--link v-sheet theme--light elevation-5")])[1]'))
+                )
+                first_card.click()
+                logger.debug("Primer card de categoría clickeado")
+            except Exception as first_card_err:
+                elapsed = time.time() - start_time
+                logger.error(f"Error al hacer clic en primer card: {first_card_err}")
+                return {"category": [], "status": f"first_card_error: {first_card_err}", "elapsed_seconds": elapsed}
+            
+            # Extraer categorías y productos
+            # Obtener todos los cards de categoría (hoverable)
+            category_cards = WebDriverWait(self.driver, 10).until(
+                lambda d: d.find_elements(By.XPATH, '//div[contains(@class, "hoverable") and contains(@class, "v-card") and contains(@class, "v-card--link") and contains(@class, "v-sheet") and contains(@class, "theme--light")]')
+            )
+            
+            if not category_cards:
+                elapsed = time.time() - start_time
+                logger.warning("No se encontraron cards de categoría")
+                return {"category": [], "status": "no_category_cards_found", "elapsed_seconds": elapsed}
+            
+            logger.info(f"Encontradas {len(category_cards)} categorías")
+            
+            for idx in range(len(category_cards)):
+                # Refrescar la lista de cards en cada iteración
+                category_cards = WebDriverWait(self.driver, 10).until(
+                    lambda d: d.find_elements(By.XPATH, '//div[contains(@class, "hoverable") and contains(@class, "v-card") and contains(@class, "v-card--link") and contains(@class, "v-sheet") and contains(@class, "theme--light")]')
+                )
+                card = category_cards[idx]
+                btn = card
+                
+                try:
+                    category_name_elem = WebDriverWait(btn, 10).until(
+                        lambda b: b.find_element(By.XPATH, './/div[contains(@class, "v-card__text") and contains(@class, "text-center")]')
+                    )
+                    category_name = category_name_elem.text
+                    logger.debug(f"Procesando categoría: {category_name}")
+                except Exception as cat_err:
+                    category_name = f"category_error_{idx}: {cat_err}"
+                    logger.warning(f"Error obteniendo nombre de categoría {idx}: {cat_err}")
+                
+                try:
+                    WebDriverWait(self.driver, 10).until(EC.element_to_be_clickable(btn)).click()
+                except Exception as btn_click_err:
+                    elapsed = time.time() - start_time
+                    logger.error(f"Error al hacer clic en categoría {idx}: {btn_click_err}")
+                    return {"category": menu_data, "status": f"btn_click_error_{idx}: {btn_click_err}", "elapsed_seconds": elapsed}
+                
+                # Extraer productos de la tabla
+                products = []
+                try:
+                    rows = WebDriverWait(self.driver, 10).until(
+                        lambda d: d.find_elements(By.XPATH, '//div[contains(@class, "v-data-table__wrapper")]/table/tbody/tr')
+                    )
+                    
+                    for row in rows:
+                        cols = row.find_elements(By.XPATH, './td')
+                        if len(cols) == 3:
+                            name = cols[0].text
+                            stock = cols[1].text
+                            price = cols[2].text
+                            products.append({"name": name, "stock": stock, "price": price})
+                    
+                    logger.debug(f"Extraídos {len(products)} productos de categoría {category_name}")
+                    
+                except Exception as prod_err:
+                    elapsed = time.time() - start_time
+                    logger.error(f"Error extrayendo productos de categoría {idx}: {prod_err}")
+                    return {"category": menu_data, "status": f"products_error_{idx}: {prod_err}", "elapsed_seconds": elapsed}
+                
+                # Volver atrás con el ícono de flecha roja
+                try:
+                    back_btn = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable((By.XPATH, '//i[contains(@class, "mdi-arrow-left") and contains(@class, "red--text")]'))
+                    )
+                    back_btn.click()
+                except Exception as back_err:
+                    elapsed = time.time() - start_time
+                    logger.error(f"Error al volver atrás desde categoría {idx}: {back_err}")
+                    return {"category": menu_data, "status": f"back_btn_error_{idx}: {back_err}", "elapsed_seconds": elapsed}
+                
+                menu_data.append({"category": category_name, "products": products})
+            
+            elapsed = time.time() - start_time
+            logger.info(f"Extracción de productos completada en {elapsed:.2f} segundos: {len(menu_data)} categorías")
+            return {"category": menu_data, "status": "products_obtained", "elapsed_seconds": elapsed}
+                
+        except Exception as menu_err:
+            elapsed = time.time() - start_time
+            logger.error(f"Error general extrayendo productos: {menu_err}")
+            return {"category": [], "status": f"products_error: {menu_err}", "elapsed_seconds": elapsed}
+
+    def scrape_productos_complete(self) -> List[ProductoDomotica]:
+        """
+        Ejecuta el proceso completo de scraping de productos (con login y logout).
+        
+        Este método:
+        1. Inicia sesión
+        2. Navega a la sección de mesas
+        3. Extrae SOLO los productos de todas las categorías
+        4. Cierra sesión
+        
+        Returns
+        -------
+        List[ProductoDomotica]
+            Lista de objetos ProductoDomotica extraídos
+        """
+        productos: List[ProductoDomotica] = []
+        
+        try:
+            # 1. Login (ya se hizo en __init__)
+            if not self.login():
+                logger.error("Login falló en scrape_productos_complete")
+                return []
+            
+            # 2. Navegar a mesas
+            go_to_tables_status = self.go_to_tables()
+            if "error" in go_to_tables_status.lower():
+                logger.error(f"Error navegando a mesas: {go_to_tables_status}")
+                return []
+            
+            # 3. Extraer productos
+            category_result = self.get_only_products()
+            
+            # 4. Convertir a objetos ProductoDomotica
+            for category_item in category_result.get("category", []):
+                category_name = category_item.get("category", "Sin categoría")
+                products = category_item.get("products", [])
+                
+                for prod_dict in products:
+                    try:
+                        producto = ProductoDomotica(
+                            categoria=category_name,
+                            nombre=prod_dict.get("name", ""),
+                            stock=prod_dict.get("stock", "0"),
+                            precio=prod_dict.get("price", "0.00")
+                        )
+                        productos.append(producto)
+                    except Exception as e:
+                        logger.error(f"Error convirtiendo producto: {e}")
+            
+            # 5. Logout
+            self.logout()
+            
+            logger.info(f"Scraping completo de productos: {len(productos)} productos extraídos")
+            return productos
+            
+        except Exception as e:
+            logger.error(f"Error en scrape_productos_complete: {str(e)}", exc_info=True)
+            return []
+
+    def scrape_mesas_complete(self) -> List[MesaDomotica]:
+        """
+        Ejecuta el proceso completo de scraping de mesas (con login y logout).
+        
+        Este método:
+        1. Inicia sesión
+        2. Navega a la sección de mesas
+        3. Extrae SOLO las mesas desde 'Gestionar Mesas'
+        4. Cierra sesión
+        
+        Returns
+        -------
+        List[MesaDomotica]
+            Lista de objetos MesaDomotica extraídos
+        """
+        mesas: List[MesaDomotica] = []
+        
+        try:
+            # 1. Login (ya se hizo en __init__)
+            if not self.login():
+                logger.error("Login falló en scrape_mesas_complete")
+                return []
+            
+            # 2. Navegar a mesas
+            go_to_tables_status = self.go_to_tables()
+            if "error" in go_to_tables_status.lower():
+                logger.error(f"Error navegando a mesas: {go_to_tables_status}")
+                return []
+            
+            # 3. Extraer mesas
+            mesas_result = self.get_only_mesas()
+            
+            # 4. Convertir a objetos MesaDomotica
+            for mesa_dict in mesas_result.get("mesas", []):
+                try:
+                    mesa = MesaDomotica(
+                        nombre=mesa_dict.get("nombre", ""),
+                        zona=mesa_dict.get("zona", ""),
+                        nota=mesa_dict.get("nota", "")
+                    )
+                    mesas.append(mesa)
+                except Exception as e:
+                    logger.error(f"Error convirtiendo mesa: {e}")
+            
+            # 5. Logout
+            self.logout()
+            
+            logger.info(f"Scraping completo de mesas: {len(mesas)} mesas extraídas")
+            return mesas
+            
+        except Exception as e:
+            logger.error(f"Error en scrape_mesas_complete: {str(e)}", exc_info=True)
+            return []
+
+    def logout(self) -> str:
+        """
+        Cierra sesión en la plataforma.
+        
+        Returns
+        -------
+        str
+            Estado de la operación: "logout_success" si es exitoso, o mensaje de error.
+        """
+        try:
+            menu_btn = WebDriverWait(self.driver, self.timeout).until(
+                EC.element_to_be_clickable((By.XPATH, '//span[contains(@class, "v-btn__content")]/i[contains(@class, "mdi-menu")]'))
+            )
+            menu_btn.click()
+            logger.debug("Menú hamburguesa clickeado")
+            
+            logout_btn = WebDriverWait(self.driver, self.timeout).until(
+                EC.element_to_be_clickable((By.XPATH, '//div[contains(@class, "v-list-item__title") and contains(text(), "Cerrar Sesion")]'))
+            )
+            logout_btn.click()
+            logger.info("Logout exitoso")
+            return "logout_success"
+        except Exception as logout_err:
+            error_msg = f"logout_error: {logout_err}"
+            logger.error(error_msg)
+            return error_msg
     
     def close(self) -> None:
         """

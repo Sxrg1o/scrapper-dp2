@@ -53,6 +53,31 @@ source venv/bin/activate  # En Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+4. **Configura las variables de entorno**:
+
+Crea un archivo `.env` en la raíz del proyecto (ya existe uno por defecto):
+
+```bash
+# .env
+DOMOTICA_BASE_URL=https://domotica-peru.com/
+DOMOTICA_USERNAME=tu_usuario
+DOMOTICA_PASSWORD=tu_contraseña
+SECRET_KEY=tu-clave-secreta-aqui
+```
+
+> **Nota**: Las credenciales por defecto (`USUARIO` / `CONTRASEÑA`) están configuradas en el archivo `.env`. 
+> Puedes modificarlas directamente en `.env` o establecer variables de entorno en tu sistema.
+
+**Prioridad de carga de configuración:**
+1. Variables de entorno del sistema (mayor prioridad)
+2. Archivo `.env`
+3. Valores por defecto en `src/core/config.py` (menor prioridad)
+
+3. Instala las dependencias:
+```bash
+pip install -r requirements.txt
+```
+
 ## Configuración
 
 El sistema utiliza un archivo `.env` para configurar credenciales y parámetros:

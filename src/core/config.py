@@ -45,15 +45,15 @@ class Settings(BaseSettings):
     port: int = 8000
 
     # Security
-    secret_key: str
+    secret_key: str = "CHANGE-ME-IN-PRODUCTION"
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 30
 
     # Domotica INC Scraping
-    domotica_base_url: str
-    domotica_username: str
-    domotica_password: str
+    domotica_base_url: str = "https://domotica-peru.com/"
+    domotica_username: str = ""
+    domotica_password: str = ""
     domotica_timeout: int = 30  # Timeout en segundos
     domotica_scrape_interval: int = (
         300  # Intervalo de actualización en segundos (5 minutos)
@@ -101,6 +101,11 @@ def get_settings() -> Settings:
     Esta función garantiza que solo exista una instancia de Settings
     en toda la aplicación, evitando cargar múltiples veces las
     configuraciones desde el entorno.
+    
+    Las configuraciones se cargan automáticamente desde:
+    1. Archivo .env (si existe)
+    2. Variables de entorno del sistema
+    3. Valores por defecto definidos en la clase Settings
 
     Returns
     -------
@@ -109,10 +114,5 @@ def get_settings() -> Settings:
     """
     global _settings_instance
     if _settings_instance is None:
-        _settings_instance = Settings(
-            domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://domotica-peru.com/"),
-            domotica_username=os.getenv("DOMOTICA_USERNAME", "meseroeder"),
-            domotica_password=os.getenv("DOMOTICA_PASSWORD", "1234eder"),
-            secret_key=os.getenv("SECRET_KEY", "your-default-secret-key"),
-        )
+        _settings_instance = Settings()
     return _settings_instance

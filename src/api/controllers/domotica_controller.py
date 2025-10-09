@@ -5,10 +5,11 @@ Este módulo implementa los endpoints para consumir datos de productos y mesas
 obtenidos mediante web scraping desde el sistema Domotica INC.
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, BackgroundTasks
 from typing import Dict, List, Any
 
 from src.model.schemas import ProductoDomotica, MesaDomotica, HealthResponse
+from src.service import domotica_service
 
 # Crear router para este controlador
 router = APIRouter()
@@ -37,66 +38,65 @@ async def health_check() -> Dict[str, Any]:
 @router.get("/productos", response_model=List[ProductoDomotica], tags=["Productos"])
 async def obtener_productos() -> List[ProductoDomotica]:
     """
-    Obtiene la lista de productos disponibles.
+    Obtiene la lista de productos mediante scraping en tiempo real.
     
-    Extrae datos de productos del sistema Domotica INC mediante web scraping.
+    Este endpoint ejecuta el scraping SOLO de productos:
+    1. Inicia sesión en Domotica INC
+    2. Navega a la sección de mesas
+    3. Extrae SOLO los productos de todas las categorías
+    4. Cierra sesión
+    5. Devuelve los productos
+    
+    NOTA: Este proceso puede tardar varios segundos.
     
     Returns:
         List[ProductoDomotica]: Lista de productos con su información
     """
-    # En una implementación real, aquí se invocaría al servicio de scraping
-    # Por ahora devolvemos datos de ejemplo
-    return [
-        ProductoDomotica(
-            categoria="Entradas",
-            nombre="Tequeños",
-            stock=20,
-            precio=12.50
-        ),
-        ProductoDomotica(
-            categoria="Platos Fuertes",
-            nombre="Lomo Saltado",
-            stock=15,
-            precio=25.50
-        ),
-        ProductoDomotica(
-            categoria="Postres",
-            nombre="Tres Leches",
-            stock=8,
-            precio=10.00
-        )
-    ]
+    return domotica_service.scrape_and_get_productos()
 
 
 @router.get("/mesas", response_model=List[MesaDomotica], tags=["Mesas"])
 async def obtener_mesas() -> List[MesaDomotica]:
     """
-    Obtiene la lista de mesas y su estado.
+    Obtiene la lista de mesas mediante scraping en tiempo real.
     
-    Extrae datos de mesas del sistema Domotica INC mediante web scraping.
+    Este endpoint ejecuta el scraping SOLO de mesas:
+    1. Inicia sesión en Domotica INC
+    2. Navega a la sección de mesas
+    3. Extrae SOLO la información de mesas desde 'Gestionar Mesas'
+    4. Cierra sesión
+    5. Devuelve las mesas
+    
+    NOTA: Este proceso puede tardar varios segundos.
     
     Returns:
         List[MesaDomotica]: Lista de mesas con su información
     """
-    # En una implementación real, aquí se invocaría al servicio de scraping
-    # Por ahora devolvemos datos de ejemplo
-    return [
-        MesaDomotica(
-            identificador="MESA-01",
-            zona="Terraza",
-            ocupado=False
-        ),
-        MesaDomotica(
-            identificador="MESA-02",
-            zona="Salón Principal",
-            ocupado=True
-        ),
-        MesaDomotica(
-            identificador="BARRA-01",
-            zona="Barra",
-            ocupado=False
-        )
-    ]
+    return domotica_service.scrape_and_get_mesas()
+
+
+@router.post("/scrape", tags=["Scraping"])
+async def ejecutar_scraping(background_tasks: BackgroundTasks) -> Dict[str, Any]:
+    """
+    Ejecuta el proceso completo de scraping para obtener productos y mesas.
+    
+    Este endpoint:
+    1. Inicia sesión en Domotica INC
+    2. Navega a la sección de mesas
+    3. Extrae información de mesas y productos de todas las categorías
+    4. Cierra sesión
+    5. Almacena los datos en memoria para consultas posteriores
+    
+    NOTA: Este proceso puede tardar varios segundos dependiendo de la cantidad
+    de categorías y productos.
+    
+    Returns:
+        Dict[str, Any]: Resultado del proceso de scraping con estadísticas
+    """
+    # Ejecutar scraping de forma síncrona (en el mismo request)
+    # Si prefieres ejecutarlo en background, usar: background_tasks.add_task(domotica_service.execute_full_scraping)
+    result = domotica_service.execute_full_scraping()
+    return result
 
 
 # Conexiones WebSocket activas

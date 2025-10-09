@@ -8,6 +8,7 @@ beautifulsoup4==4.14.2
 certifi==2025.10.5
 cffi==2.0.0
 click==8.3.0
+selenium==4.27.1
 cryptography==46.0.2
 dnspython==2.8.0
 ecdsa==0.19.1

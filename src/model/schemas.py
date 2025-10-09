@@ -23,27 +23,11 @@ class ProductoDomotica(BaseModel):
     nombre: str
     """Nombre completo del producto"""
 
-    cantidad: int = 1
-    """Cantidad del producto pedido o disponible"""
+    stock: str
+    """Stock disponible del producto (puede ser número o texto como 'Agotado')"""
 
-    precio: float
-    """Precio del producto en moneda local"""
-
-    @field_validator("precio")
-    @classmethod
-    def precio_must_be_positive(cls, v: float) -> float:
-        """Validar que el precio sea positivo."""
-        if v <= 0:
-            raise ValueError("El precio debe ser mayor que cero")
-        return round(v, 2)  # Redondear a dos decimales
-
-    @field_validator("cantidad")
-    @classmethod
-    def cantidad_must_be_positive(cls, v: int) -> int:
-        """Validar que la cantidad sea positiva."""
-        if v <= 0:
-            raise ValueError("La cantidad debe ser mayor que cero")
-        return v
+    precio: str
+    """Precio del producto en moneda local (formato string desde el scraping)"""
 
     model_config = {
         "json_schema_extra": {
@@ -51,8 +35,8 @@ class ProductoDomotica(BaseModel):
                 {
                     "categoria": "Platos Fuertes",
                     "nombre": "Lomo Saltado",
-                    "cantidad": 2,
-                    "precio": 25.50,
+                    "stock": "15",
+                    "precio": "25.50",
                 }
             ]
         }
@@ -67,25 +51,25 @@ class MesaDomotica(BaseModel):
     de mesas obtenidos mediante web scraping.
     """
 
-    identificador: str
-    """Identificador único de la mesa"""
+    nombre: str
+    """Nombre/identificador de la mesa"""
 
     zona: str
     """Zona o área del restaurante donde se ubica la mesa"""
 
-    ocupado: bool
-    """Estado de ocupación de la mesa"""
+    nota: str = ""
+    """Notas adicionales sobre la mesa"""
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"identificador": "MESA-01", "zona": "Terraza", "ocupado": False}
+                {"nombre": "MESA-01", "zona": "Terraza", "nota": ""}
             ]
         }
     }
 
     def __str__(self) -> str:
-        return f"Mesa {self.identificador} en zona {self.zona} - {'Ocupada' if self.ocupado else 'Libre'}"
+        return f"Mesa {self.nombre} en zona {self.zona}"
 
 
 class HealthResponse(BaseModel):
