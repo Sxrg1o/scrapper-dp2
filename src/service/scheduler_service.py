@@ -72,7 +72,7 @@ class SchedulerService:
 
                 response = requests.post(
                     self.sync_mesas_url,
-                    json=[m.model_dump_json() for m in mesas],
+                    json=[m.model_dump() for m in mesas],
                     headers=headers,
                     timeout=30,
                 )
@@ -110,13 +110,8 @@ class SchedulerService:
                     logger.error("No se pudo iniciar sesión en Domotica Peru")
                     return False
 
-                # Navegar a la comanda para poder extraer platos
-                if not domotica.navigate_to_mesa_comanda():
-                    logger.error("No se pudo navegar a la comanda de una mesa")
-                    return False
-
                 # Extraer platos
-                platos = domotica.scrap_platos()
+                platos = domotica.scrape_productos_complete()
 
                 if not platos:
                     logger.warning("No se encontraron platos para sincronizar")
@@ -128,12 +123,18 @@ class SchedulerService:
                 headers = {
                     "Content-Type": "application/json",
                 }
+                
+                # Usar model_dump() en lugar de model_dump_json() para obtener diccionarios Python
+                platos_data = [p.model_dump() for p in platos]
+                logger.info(f"Datos de platos a sincronizar: {len(platos_data)} items")
+                for p in platos_data:
+                    logger.info(p)
 
                 response = requests.post(
                     self.sync_platos_url,
-                    json=[p.model_dump_json() for p in platos],
+                    json=platos_data,
                     headers=headers,
-                    timeout=30,
+                    timeout=180,
                 )
 
                 if response.status_code == 200:

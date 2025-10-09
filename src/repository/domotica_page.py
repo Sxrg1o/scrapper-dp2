@@ -457,21 +457,6 @@ class DomoticaPage:
                 f"Error durante la navegación a comanda de mesa {mesa_id}: {str(e)}"
             )
             return False
-
-    def scrap_platos(self) -> List[ProductoDomotica]:
-        """
-        Extrae la lista de productos/platos disponibles en la plataforma.
-        
-        Este método debe ser llamado después de navegar a la vista de una mesa
-        y obtener acceso al catálogo de productos.
-        
-        Returns
-        -------
-        List[ProductoDomotica]
-            Lista de objetos ProductoDomotica con la información extraída.
-        """
-        logger.info("Método scrap_platos no implementado completamente")
-        return []
     
     def go_to_tables(self) -> str:
         """
@@ -689,7 +674,6 @@ class DomoticaPage:
         Ejecuta el proceso completo de scraping de productos (con login y logout).
         
         Este método:
-        1. Inicia sesión
         2. Navega a la sección de mesas
         3. Extrae SOLO los productos de todas las categorías
         4. Cierra sesión
@@ -702,11 +686,6 @@ class DomoticaPage:
         productos: List[ProductoDomotica] = []
         
         try:
-            # 1. Login (ya se hizo en __init__)
-            if not self.login():
-                logger.error("Login falló en scrape_productos_complete")
-                return []
-            
             # 2. Navegar a mesas
             go_to_tables_status = self.go_to_tables()
             if "error" in go_to_tables_status.lower():
