@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
 
     # Domotica INC Scraping
+    api_base_url: str
     domotica_base_url: str
     domotica_username: str
     domotica_password: str
@@ -120,5 +121,10 @@ def get_settings() -> Settings:
     """
     global _settings_instance
     if _settings_instance is None:
-        _settings_instance = Settings()
+        _settings_instance = Settings(
+            api_base_url=os.getenv("API_BASE_URL", "http://localhost:8000"),
+            domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://domotica.pe"),
+            domotica_username=os.getenv("DOMOTICA_USERNAME", "your-username"),
+            domotica_password=os.getenv("DOMOTICA_PASSWORD", "your-password"),
+        )
     return _settings_instance

@@ -374,9 +374,9 @@ class DomoticaPage:
 
                     mesas.append(
                         MesaDomotica(
-                            identificador=numero,
+                            nombre=numero,
                             zona="Desconocida",
-                            ocupado=estado_texto == "Ocupada",
+                            nota=estado_texto,
                         )
                     )
                     logger.debug(f"Mesa extraída: {numero} - Estado: {estado_texto}")

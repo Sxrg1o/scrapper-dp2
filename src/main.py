@@ -5,15 +5,19 @@ Punto de entrada principal de la aplicación FastAPI para Domotica Scrapper.
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.config import get_settings
 from src.core.logging import configure_logging
+from src.service.scheduler_service import SchedulerService
 
 
 # Configurar logger para este módulo
 logger = logging.getLogger(__name__)
+
+# Crear instancia del scheduler service
+scheduler = SchedulerService()
 
 
 @asynccontextmanager
@@ -35,19 +39,30 @@ async def lifespan(app: FastAPI):
     """
     # Fase de inicialización
     logger.info("Iniciando Domotica Scrapper API...")
-    
+
     # Configurar sistema de logging
     configure_logging()
-    
-    # Aquí se pueden inicializar más recursos (BD, conexiones, etc.)
+
+    # Iniciar el scheduler para sync_platos
+    logger.info("Iniciando el servicio de sincronización de platos...")
+    if scheduler.start("00:00"):  # Sincronizar cada día a medianoche
+        logger.info("Servicio de sincronización iniciado correctamente")
+    else:
+        logger.error("No se pudo iniciar el servicio de sincronización")
+
     logger.info("Domotica Scrapper API iniciada correctamente")
 
     yield  # Aplicación en funcionamiento
 
     # Fase de limpieza
     logger.info("Cerrando Domotica Scrapper API...")
-    
-    # Aquí se pueden cerrar conexiones y liberar recursos
+
+    # Detener el scheduler
+    if scheduler.is_running:
+        logger.info("Deteniendo el servicio de sincronización...")
+        scheduler.stop()
+
+    # Aquí se pueden cerrar otras conexiones y liberar recursos
     logger.info("Recursos liberados correctamente")
 
 
@@ -61,7 +76,57 @@ def register_routers(app: FastAPI) -> None:
         La instancia de la aplicación FastAPI donde registrar los routers
     """
     from src.api.controllers.domotica_controller import router as domotica_router
+
     app.include_router(domotica_router, prefix="/api/v1")
+
+    # Agregar endpoint de health check
+    @app.get("/health", tags=["Health Check"])
+    async def health_check():
+        """
+        Health check endpoint para verificar que la API está funcionando.
+
+        Returns:
+        -------
+        dict
+            Estado de la aplicación y status del scheduler
+        """
+        return {
+            "status": "ok",
+            "scheduler_running": scheduler.is_running,
+            "app_version": get_settings().app_version,
+        }
+
+    @app.post("/sync/platos", tags=["Sync"])
+    async def manual_sync(response: Response):
+        """
+        Ejecuta una sincronización manual de platos.
+
+        Returns:
+        -------
+        dict
+            Resultado de la sincronización
+        """
+        result = scheduler.sync_platos()
+        if not result:
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            return {"status": "error", "message": "La sincronización falló"}
+        return {"status": "success", "message": "Sincronización completada con éxito"}
+
+    @app.get("/sync/mesas", tags=["Sync"])
+    async def manual_sync_mesas(response: Response):
+        """
+        Ejecuta una sincronización manual de mesas.
+
+        Returns:
+        -------
+        dict
+            Resultado de la sincronización
+        """
+        result = scheduler.sync_mesas()
+        if not result:
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            return {"status": "error", "message": "La sincronización falló"}
+        return {"status": "success", "message": "Sincronización completada con éxito"}
 
 
 def create_app() -> FastAPI:
@@ -100,6 +165,7 @@ def create_app() -> FastAPI:
     register_routers(app)
 
     return app
+
 
 # Crear la instancia de la aplicación
 app = create_app()

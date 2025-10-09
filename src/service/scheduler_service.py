@@ -33,9 +33,63 @@ class SchedulerService:
         Inicializa el servicio de programación de tareas.
         """
         self.settings = get_settings()
-        self.sync_url = f"{self.settings.api_base_url}/api/v1/sync/platos"
+        self.sync_platos_url = f"{self.settings.api_base_url}/api/v1/sync/platos"
+        self.sync_mesas_url = f"{self.settings.api_base_url}/api/v1/sync/mesas"
         self.scheduler_thread = None
         self.is_running = False
+
+    def sync_mesas(self) -> bool:
+        """
+        Sincroniza las mesas extraídas con el endpoint de la API.
+
+        Este método extrae las mesas usando DomoticaPage.scrap_mesas()
+        y las envía al endpoint de sincronización.
+
+        Returns:
+            bool: True si la sincronización fue exitosa, False en caso contrario.
+        """
+        logger.info("Iniciando sincronización de mesas con la API")
+
+        try:
+            # Inicializar DomoticaPage y extraer mesas
+            with DomoticaPage() as domotica:
+                if not domotica.login():
+                    logger.error("No se pudo iniciar sesión en Domotica Peru")
+                    return False
+
+                mesas = domotica.scrap_mesas()
+
+                if not mesas:
+                    logger.warning("No se encontraron mesas para sincronizar")
+                    return False
+
+                logger.info(f"Se extrajeron {len(mesas)} mesas para sincronización")
+
+                # Enviar datos al endpoint de sincronización
+                headers = {
+                    "Content-Type": "application/json",
+                }
+
+                response = requests.post(
+                    self.sync_mesas_url,
+                    json=[m.model_dump_json() for m in mesas],
+                    headers=headers,
+                    timeout=30,
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"Sincronización exitosa. Respuesta: {result}")
+                    return True
+                else:
+                    logger.error(
+                        f"Error en sincronización: {response.status_code} - {response.text}"
+                    )
+                    return False
+
+        except Exception as e:
+            logger.error(f"Error durante la sincronización de mesas: {str(e)}")
+            return False
 
     def sync_platos(self) -> bool:
         """
@@ -73,11 +127,10 @@ class SchedulerService:
                 # Enviar datos al endpoint de sincronización
                 headers = {
                     "Content-Type": "application/json",
-                    "X-API-Key": self.settings.api_key,
                 }
 
                 response = requests.post(
-                    self.sync_url,
+                    self.sync_platos_url,
                     json=[p.model_dump_json() for p in platos],
                     headers=headers,
                     timeout=30,
