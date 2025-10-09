@@ -1,113 +1,184 @@
-# Automatización Web con FastAPI y Selenium vs UiPath
+# Scraper de Domotica Perú
 
-## Instrucciones de despliegue
+Un sistema de web scraping para la plataforma de Domotica Perú, implementado con una arquitectura en capas, utilizando Selenium y BeautifulSoup para la extracción de datos.
 
-### Con Docker Compose (recomendado)
+## Características
 
-1. Clona este repositorio:
+- 🚀 Extracción de datos de la plataforma Domotica Perú
+- 📊 Arquitectura en capas bien definida
+- 🔍 Trazabilidad completa de operaciones
+- 🛡️ Gestión de configuración segura
+- 📝 Documentación detallada
+- 🧪 Pruebas unitarias
+
+## Arquitectura
+
+El proyecto sigue una arquitectura en capas:
+
+```
+scrapper-dp2/
+├── src/
+│   ├── api/            # Capa de API
+│   ├── core/           # Configuración y funcionalidades transversales
+│   ├── model/          # Modelos de datos
+│   ├── repository/     # Acceso a datos externos (scraping)
+│   ├── service/        # Lógica de negocio
+│   └── main.py         # Punto de entrada de la aplicación
+├── test/               # Pruebas unitarias e integración
+└── examples/           # Ejemplos de uso
+```
+
+## Requisitos
+
+- Python 3.10+
+- Chrome/Chromium Browser
+- ChromeDriver compatible con tu versión de Chrome
+
+## Instalación
+
+1. Clona el repositorio:
 ```bash
-git clone https://github.com/Sxrg1o/scrapper-dp2.git
+git clone https://github.com/dp2-eder/scrapper-dp2.git
 cd scrapper-dp2
 ```
 
-2. Construye y ejecuta la aplicación con Docker Compose:
+2. Crea un entorno virtual:
 ```bash
-docker compose up -d
+python -m venv venv
+source venv/bin/activate  # En Windows: venv\Scripts\activate
 ```
 
-3. La aplicación estará disponible en http://localhost:8000
-
-### Con Docker (manual)
-
-1. Construye la imagen:
+3. Instala las dependencias:
 ```bash
-docker build -t scrapper-dp2 .
+pip install -r requirements.txt
 ```
 
-2. Ejecuta el contenedor:
+## Configuración
+
+El sistema utiliza un archivo `.env` para configurar credenciales y parámetros:
+
 ```bash
-docker run -p 8000:8000 --name scrapper-dp2 scrapper-dp2
+# Crear archivo .env en la raíz del proyecto
+DOMOTICA_USERNAME=tu_usuario
+DOMOTICA_PASSWORD=tu_contraseña
+DOMOTICA_BASE_URL=https://url-de-domotica
+DOMOTICA_TIMEOUT=10
 ```
-
-## ¿Por qué elegir esta solución sobre UiPath?
-
-### 1. Costos y Accesibilidad
-- **Solución Actual (FastAPI + Selenium)**: 
-  - Completamente gratuita y open source
-  - Sin límites de ejecuciones o robots
-  - Sin costos de licenciamiento
-  - Control total sobre el código y la implementación
-- **UiPath**:
-  - Modelo de licenciamiento costoso
-  - Limitaciones en la versión Community
-  - Dependencia del vendor para actualizaciones y soporte
-
-### 2. Naturaleza de la Automatización
-- **Contexto**: Automatización de una aplicación web (Little Caesars)
-- **Ventajas de nuestra solución**:
-  - Selenium está diseñado específicamente para automatización web
-  - Interacción directa con elementos del DOM
-  - Mayor precisión en la manipulación de elementos web
-  - Mejor manejo de tiempos de carga y estados asíncronos
-- **Limitaciones de UiPath**:
-  - Sobrecualificado para automatizaciones web simples
-  - Mayor overhead por funcionalidades no necesarias
-  - Menor flexibilidad en el manejo de elementos web dinámicos
-
-### 3. Integración y Escalabilidad
-- **Solución FastAPI + Selenium**:
-  - API RESTful lista para integrarse con cualquier sistema
-  - Documentación automática con Swagger UI
-  - Fácil de escalar horizontalmente
-  - Puede ejecutarse en contenedores Docker
-  - Control granular de la lógica de negocio
-- **UiPath**:
-  - Limitaciones en la integración con sistemas externos
-  - Menos flexible para despliegues en la nube
-  - Dependencia de Orchestrator para escalabilidad
-
-### 4. Mantenibilidad y Control
-- **Ventajas de código Python**:
-  - Control total sobre el flujo de ejecución
-  - Fácil de versionar con Git
-  - Debugging más directo y preciso
-  - Testing unitario simplificado
-  - Mayor pool de desarrolladores disponibles
-- **UiPath**:
-  - Dependencia de la plataforma para modificaciones
-  - Debugging más complejo
-  - Menor flexibilidad en el control de errores
-
-### 5. Tiempo de Desarrollo
-- **Nuestra Solución**:
-  - Desarrollo rápido con Python
-  - Reutilización de componentes
-  - Ciclos de desarrollo más cortos
-  - Fácil de modificar y adaptar
-- **UiPath**:
-  - Mayor tiempo en configuración inicial
-  - Curva de aprendizaje más pronunciada
-  - Menos flexibilidad para cambios rápidos
-
-## Conclusión
-Para una automatización web como esta, la combinación de FastAPI y Selenium ofrece una solución más liviana, flexible y costo-efectiva que UiPath. La naturaleza específica de la tarea (automatización web) hace que las herramientas especializadas como Selenium sean más apropiadas que una solución RPA completa como UiPath.
-
-## Estructura del Proyecto
-- `main.py`: API FastAPI con endpoints para el menú y automatización
-- `selenium_test.py`: Script de automatización web
-- `templates/`: Plantillas HTML para la interfaz de usuario
-- `requirements.txt`: Dependencias del proyecto
 
 ## Uso
-1. Instalar dependencias:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Ejecutar el servidor:
-   ```bash
-   uvicorn main:app --reload
-   ```
-3. Acceder a:
-   - API docs: http://localhost:8000/docs
-   - Login: http://localhost:8000/login
-   - Menú: http://localhost:8000/PizzasLitleCesar
+
+### Flujo Completo de Scraping
+
+El ejemplo completo muestra cómo realizar todo el flujo de scraping:
+
+```bash
+python examples/complete_scraping_flow.py
+```
+
+Este script realiza:
+1. Login en la plataforma
+2. Navegación al panel principal
+3. Navegación a la lista de mesas
+4. Extracción de datos de las mesas
+5. Navegación a la comanda de una mesa específica
+6. Extracción de categorías de productos
+7. Extracción de todos los productos de todas las categorías
+
+### Ejemplo de código básico
+
+```python
+from src.repository.domotica_page import DomoticaPage
+
+# Crear instancia del scraper con el contexto manager
+with DomoticaPage() as page:
+    # Iniciar sesión
+    if page.login():
+        # Navegar al panel
+        page.navigate_to_panel()
+        
+        # Navegar a mesas
+        if page.navigate_to_tables():
+            # Obtener datos de las mesas
+            mesas = page.scrape_tables_data()
+            
+            # Seleccionar la primera mesa disponible
+            if mesas:
+                mesa = mesas[0]
+                print(f"Mesa: {mesa.identificador}, Zona: {mesa.zona}")
+                
+                # Navegar a la comanda de la mesa
+                if page.navigate_to_mesa_comanda(mesa.identificador):
+                    # Extraer productos
+                    productos = page.scrape_productos()
+                    
+                    # Mostrar productos encontrados
+                    for producto in productos:
+                        print(f"{producto.nombre} - {producto.categoria} - S/.{producto.precio}")
+```
+
+4. Configura las variables de entorno:
+```bash
+cp .env.example .env
+# Edita el archivo .env con tus credenciales y configuración
+```
+
+## Uso
+
+### Como módulo
+
+```python
+from src.repository.domotica_page import DomoticaPage
+
+# Usando el patrón "with" para gestión automática de recursos
+with DomoticaPage() as scraper:
+    # Login
+    scraper.login()
+    
+    # Navegar a la sección de mesas
+    scraper.navigate_to_tables()
+    
+    # Extraer datos
+    mesas = scraper.scrape_tables_data()
+    
+    # Procesar los datos
+    for mesa in mesas:
+        print(f"Mesa: {mesa['nombre']} - Estado: {mesa['estado']}")
+```
+
+### Mediante el ejemplo incluido
+
+```bash
+python examples/use_domotica_scraper.py
+```
+
+## Configuración
+
+La configuración se realiza a través de variables de entorno o un archivo `.env`. Las principales variables son:
+
+| Variable | Descripción | Valor por defecto |
+|----------|-------------|-------------------|
+| DOMOTICA_BASE_URL | URL base de la plataforma | https://example.com/ |
+| DOMOTICA_USERNAME | Nombre de usuario | your_username |
+| DOMOTICA_PASSWORD | Contraseña | your_password |
+| DOMOTICA_TIMEOUT | Timeout en segundos | 30 |
+| DEBUG | Modo de depuración | False |
+
+## Desarrollo
+
+### Ejecutar pruebas
+
+```bash
+python -m unittest discover -s test
+```
+
+### Contribuir
+
+1. Crea un fork del proyecto
+2. Crea una rama para tu funcionalidad (`git checkout -b feature/amazing-feature`)
+3. Realiza tus cambios y haz commit (`git commit -m 'Add some amazing feature'`)
+4. Sube los cambios a tu repositorio (`git push origin feature/amazing-feature`)
+5. Crea un Pull Request
+
+## Licencia
+
+Este proyecto está licenciado bajo [MIT License](LICENSE).

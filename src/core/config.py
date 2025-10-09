@@ -3,8 +3,7 @@ Configuración de la aplicación Domotica Scrapper.
 """
 
 import os
-from typing import List, Optional, ClassVar, Any
-from pydantic import field_validator
+from typing import Optional, ClassVar
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,14 +60,14 @@ class Settings(BaseSettings):
     )
 
     # CORS
-    allowed_origins: List[str] = ["http://localhost:3000"]
-    allowed_methods: List[str] = ["GET", "POST", "PUT", "DELETE", "PATCH"]
-    allowed_headers: List[str] = ["*"]
+    allowed_origins: str = "*"
+    allowed_methods: str = "GET,POST,PUT,DELETE,PATCH"
+    allowed_headers: str = "*"
 
     # File uploads
     max_file_size: int = 10485760  # 10MB
     upload_dir: str = "uploads"
-    allowed_extensions: List[str] = ["jpg", "jpeg", "png", "gif", "webp"]
+    allowed_extensions: str = "jpg,jpeg,png,gif,webp"
 
     # Email configuration (optional)
     smtp_host: Optional[str] = None
@@ -88,37 +87,7 @@ class Settings(BaseSettings):
     default_page_size: int = 20
     max_page_size: int = 100
 
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v: Any) -> List[str] | Any:
-        """Parse CORS origins from string or list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
-
-    @field_validator("allowed_methods", mode="before")
-    @classmethod
-    def parse_cors_methods(cls, v: Any) -> List[str] | Any:
-        """Parse CORS methods from string or list."""
-        if isinstance(v, str):
-            return [method.strip() for method in v.split(",")]
-        return v
-
-    @field_validator("allowed_headers", mode="before")
-    @classmethod
-    def parse_cors_headers(cls, v: Any) -> List[str] | Any:
-        """Parse CORS headers from string or list."""
-        if isinstance(v, str):
-            return [header.strip() for header in v.split(",")]
-        return v
-
-    @field_validator("allowed_extensions", mode="before")
-    @classmethod
-    def parse_allowed_extensions(cls, v: Any) -> List[str] | Any:
-        """Parse allowed file extensions from string or list."""
-        if isinstance(v, str):
-            return [ext.strip() for ext in v.split(",")]
-        return v
+    # Eliminamos los field_validators que estaban causando problemas
 
 
 # Singleton instance
@@ -141,9 +110,9 @@ def get_settings() -> Settings:
     global _settings_instance
     if _settings_instance is None:
         _settings_instance = Settings(
-            domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://example.com/"),
-            domotica_username=os.getenv("DOMOTICA_USERNAME", "your_username"),
-            domotica_password=os.getenv("DOMOTICA_PASSWORD", "your_password"),
+            domotica_base_url=os.getenv("DOMOTICA_BASE_URL", "https://domotica-peru.com/"),
+            domotica_username=os.getenv("DOMOTICA_USERNAME", "meseroeder"),
+            domotica_password=os.getenv("DOMOTICA_PASSWORD", "1234eder"),
             secret_key=os.getenv("SECRET_KEY", "your-default-secret-key"),
         )
     return _settings_instance
