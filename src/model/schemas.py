@@ -5,8 +5,38 @@ Este módulo define los modelos Pydantic utilizados para la validación,
 serialización y documentación de la API.
 """
 
-from typing import Dict, Optional, Any
+from enum import Enum
+from typing import Dict, Optional, Any, Union
+
 from pydantic import BaseModel, field_validator
+
+
+class MesaEstadoEnum(str, Enum):
+    """Enumeración de estados posibles para una mesa."""
+
+    DISPONIBLE = "disponible"
+    OCUPADA = "ocupada"
+    RESERVADA = "reservada"
+    DESCONOCIDO = "desconocido"
+
+    @classmethod
+    def from_str(cls, raw_value: Optional[str]) -> "MesaEstadoEnum":
+        """Normaliza distintos textos o estilos para mapearlos a un estado."""
+
+        if not raw_value:
+            return cls.DESCONOCIDO
+
+        normalized = raw_value.strip().lower()
+        mapping = {
+            "disponible": cls.DISPONIBLE,
+            "libre": cls.DISPONIBLE,
+            "mesa libre": cls.DISPONIBLE,
+            "ocupada": cls.OCUPADA,
+            "reservada": cls.RESERVADA,
+            "reservado": cls.RESERVADA,
+        }
+
+        return mapping.get(normalized, cls.DESCONOCIDO)
 
 
 class ProductoDomotica(BaseModel):
@@ -57,19 +87,37 @@ class MesaDomotica(BaseModel):
     zona: str
     """Zona o área del restaurante donde se ubica la mesa"""
 
-    nota: str = ""
+    nota: Optional[str] = None
     """Notas adicionales sobre la mesa"""
+
+    estado: MesaEstadoEnum = MesaEstadoEnum.DISPONIBLE
+    """Estado de la mesa (disponible, ocupada, reservada, etc.)"""
 
     model_config = {
         "json_schema_extra": {
             "examples": [
-                {"nombre": "MESA-01", "zona": "Terraza", "nota": ""}
+                {
+                    "nombre": "MESA-01",
+                    "zona": "Terraza",
+                    "nota": None,
+                    "estado": MesaEstadoEnum.DISPONIBLE.value,
+                }
             ]
         }
     }
 
     def __str__(self) -> str:
         return f"Mesa {self.nombre} en zona {self.zona}"
+
+    @field_validator("estado", mode="before")
+    @classmethod
+    def _ensure_enum(cls, value: Union[str, MesaEstadoEnum]) -> MesaEstadoEnum:
+        """Permite recibir cadenas y las convierte al enum correspondiente."""
+
+        if isinstance(value, MesaEstadoEnum):
+            return value
+
+        return MesaEstadoEnum.from_str(str(value))
 
 
 class HealthResponse(BaseModel):

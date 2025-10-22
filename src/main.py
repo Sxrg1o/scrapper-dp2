@@ -40,9 +40,6 @@ async def lifespan(app: FastAPI):
     # Fase de inicialización
     logger.info("Iniciando Domotica Scrapper API...")
 
-    # Configurar sistema de logging
-    configure_logging()
-
     # Iniciar el scheduler para sync_platos
     logger.info("Iniciando el servicio de sincronización de platos...")
     if scheduler.start("00:00"):  # Sincronizar cada día a medianoche
@@ -66,69 +63,6 @@ async def lifespan(app: FastAPI):
     logger.info("Recursos liberados correctamente")
 
 
-def register_routers(app: FastAPI) -> None:
-    """
-    Registra todos los routers de la aplicación.
-
-    Parameters
-    ----------
-    app : FastAPI
-        La instancia de la aplicación FastAPI donde registrar los routers
-    """
-    from src.api.controllers.domotica_controller import router as domotica_router
-
-    app.include_router(domotica_router, prefix="/api/v1")
-
-    # Agregar endpoint de health check
-    @app.get("/health", tags=["Health Check"])
-    async def health_check():
-        """
-        Health check endpoint para verificar que la API está funcionando.
-
-        Returns:
-        -------
-        dict
-            Estado de la aplicación y status del scheduler
-        """
-        return {
-            "status": "ok",
-            "scheduler_running": scheduler.is_running,
-            "app_version": get_settings().app_version,
-        }
-
-    @app.post("/sync/platos", tags=["Sync"])
-    async def manual_sync(response: Response):
-        """
-        Ejecuta una sincronización manual de platos.
-
-        Returns:
-        -------
-        dict
-            Resultado de la sincronización
-        """
-        result = scheduler.sync_platos()
-        if not result:
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return {"status": "error", "message": "La sincronización falló"}
-        return {"status": "success", "message": "Sincronización completada con éxito"}
-
-    @app.get("/sync/mesas", tags=["Sync"])
-    async def manual_sync_mesas(response: Response):
-        """
-        Ejecuta una sincronización manual de mesas.
-
-        Returns:
-        -------
-        dict
-            Resultado de la sincronización
-        """
-        result = scheduler.sync_mesas()
-        if not result:
-            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
-            return {"status": "error", "message": "La sincronización falló"}
-        return {"status": "success", "message": "Sincronización completada con éxito"}
-
-
 def create_app() -> FastAPI:
     """
     Crea y configura la aplicación FastAPI.
@@ -142,6 +76,7 @@ def create_app() -> FastAPI:
         Instancia configurada de la aplicación
     """
     settings = get_settings()
+    configure_logging()
 
     # Crear la instancia de FastAPI
     app = FastAPI(
@@ -161,8 +96,41 @@ def create_app() -> FastAPI:
         allow_headers=settings.allowed_headers,
     )
 
-    # Registrar todos los routers disponibles
-    register_routers(app)
+    from src.api.controllers.domotica_controller import router as domotica_router
+
+    app.include_router(domotica_router, prefix="/api/v1")
+
+    @app.post("/sync/platos", tags=["Sync"])
+    async def sync_platos(response: Response):
+        """
+        Ejecuta una sincronización manual de platos.
+
+        Returns:
+        -------
+        dict
+            Resultado de la sincronización
+        """
+        result = scheduler.sync_platos()
+        if not result:
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            return {"status": "error", "message": "La sincronización falló"}
+        return {"status": "success", "message": "Sincronización completada con éxito"}
+
+    @app.get("/sync/mesas", tags=["Sync"])
+    async def sync_mesas(response: Response):
+        """
+        Ejecuta una sincronización manual de mesas.
+
+        Returns:
+        -------
+        dict
+            Resultado de la sincronización
+        """
+        result = scheduler.sync_mesas()
+        if not result:
+            response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+            return {"status": "error", "message": "La sincronización falló"}
+        return {"status": "success", "message": "Sincronización completada con éxito"}
 
     return app
 

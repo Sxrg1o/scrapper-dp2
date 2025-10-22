@@ -74,7 +74,7 @@ class SchedulerService:
                     self.sync_mesas_url,
                     json=[m.model_dump() for m in mesas],
                     headers=headers,
-                    timeout=30,
+                    timeout=180,
                 )
 
                 if response.status_code == 200:
@@ -111,7 +111,7 @@ class SchedulerService:
                     return False
 
                 # Extraer platos
-                platos = domotica.scrape_productos_complete()
+                platos = domotica.scrap_productos()
 
                 if not platos:
                     logger.warning("No se encontraron platos para sincronizar")
@@ -123,9 +123,9 @@ class SchedulerService:
                 headers = {
                     "Content-Type": "application/json",
                 }
-                
+
                 # Usar model_dump() en lugar de model_dump_json() para obtener diccionarios Python
-                platos_data = [p.model_dump() for p in platos]
+                platos_data: List[Dict[str, str]] = [p.model_dump() for p in platos]
                 logger.info(f"Datos de platos a sincronizar: {len(platos_data)} items")
                 for p in platos_data:
                     logger.info(p)
@@ -167,12 +167,12 @@ class SchedulerService:
             schedule.every().day.at(time_str).do(self.sync_platos)
 
             # Ejecutar inmediatamente la primera sincronización
-            if self.sync_platos():
-                logger.info("Primera sincronización completada con éxito")
-            else:
-                logger.warning(
-                    "La primera sincronización falló, se reintentará según programación"
-                )
+            # if self.sync_platos():
+            #     logger.info("Primera sincronización completada con éxito")
+            # else:
+            #     logger.warning(
+            #         "La primera sincronización falló, se reintentará según programación"
+            #     )
 
             return True
 
