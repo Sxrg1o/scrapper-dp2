@@ -97,11 +97,17 @@ class MesaDomotica(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "nombre": "MESA-01",
-                    "zona": "Terraza",
+                    "nombre": "P4",
+                    "zona": "ZONA 3",
+                    "nota": "PULPO",
+                    "estado": "disponible",
+                },
+                {
+                    "nombre": "Z LLEVAR 1",
+                    "zona": "ZONA 1",
                     "nota": None,
-                    "estado": MesaEstadoEnum.DISPONIBLE.value,
-                }
+                    "estado": "disponible",
+                },
             ]
         }
     }
