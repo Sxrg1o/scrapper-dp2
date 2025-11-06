@@ -6,9 +6,42 @@ serialización y documentación de la API.
 """
 
 from enum import Enum
-from typing import Dict, Optional, Any, Union
+from typing import Dict, Optional, Any, Union, List
 
 from pydantic import BaseModel, field_validator
+
+
+class TipoDocumentoEnum(str, Enum):
+    """Enumeración de tipos de documento para comprobante electrónico."""
+    
+    DNI = "DNI"
+    RUC = "RUC"
+    PASAPORTE = "Pasaporte"
+    CARNET_EXTRANJERIA = "Carnet de Extranjeria"
+
+
+class TipoComprobanteEnum(str, Enum):
+    """Enumeración de tipos de comprobante electrónico."""
+    
+    NOTA = "Nota"
+    BOLETA = "Boleta"
+    FACTURA = "Factura"
+
+
+class ComprobanteElectronico(BaseModel):
+    """
+    Modelo que representa los datos para el comprobante electrónico.
+    
+    Se utiliza cuando se finaliza una orden y se necesita generar
+    el comprobante correspondiente.
+    """
+    
+    tipo_documento: TipoDocumentoEnum
+    numero_documento: str
+    nombres_completos: str
+    direccion: str
+    observacion: str
+    tipo_comprobante: TipoComprobanteEnum
 
 
 class MesaEstadoEnum(str, Enum):
@@ -174,6 +207,110 @@ class WebSocketMessage(BaseModel):
                         "zona": "Salón Principal",
                         "ocupado": True,
                     },
+                }
+            ]
+        }
+    }
+
+
+class PlatoInsertRequest(BaseModel):
+    """
+    Modelo para la solicitud de inserción de platos en una mesa.
+    Usa los mismos valores de los objetos MesaDomotica y ProductoDomotica.
+    """
+
+    mesa: MesaDomotica
+    """Información de la mesa donde se van a insertar los platos"""
+    
+    platos: List[ProductoDomotica]
+    """Lista de platos a insertar en la mesa"""
+    
+    comprobante: ComprobanteElectronico
+    """Datos del comprobante electrónico a generar después de la inserción"""
+
+    model_config = {
+        "json_schema_extra": {
+            # single OpenAPI example shown in Swagger UI (makes request body include 'comprobante')
+            "examples": [
+                {
+                "mesa": {
+                    "nombre": "J5",
+                    "zona": "ZONA 2",
+                    "nota": "JARDIN",
+                    "estado": "ocupada"
+                },
+                "platos": [
+                    {
+                        "categoria": "CEVICHES",
+                        "nombre": "CEVICHE NORTENO",
+                        "stock": "1",
+                        "precio": "35.00"
+                    },
+                    {
+                        "categoria": "PIQUEOS",
+                        "nombre": "CHOROS A LA CHALACA",
+                        "stock": "1",
+                        "precio": "30.00"
+                    },
+                    {
+                        "categoria": "BEBIDAS CON ALCOHOL",
+                        "nombre": "PILSEN CALLAO 630ML",
+                        "stock": "22",
+                        "precio": "13.00"
+                    }
+                ],
+                "comprobante": {
+                    "tipo_documento": "RUC",
+                    "numero_documento": "7777777",
+                    "nombres_completos": "Pepito",
+                    "direccion": "Lima",
+                    "observacion": "sin observaciones",
+                    "tipo_comprobante": "Factura"
+                }
+            }
+            ]
+        }
+    }
+
+
+class PlatoInsertResponse(BaseModel):
+    """
+    Modelo para la respuesta de inserción de platos en mesa.
+    """
+
+    success: bool
+    """Indica si la inserción fue exitosa"""
+    
+    message: str
+    """Mensaje descriptivo del resultado"""
+    
+    mesa_nombre: Optional[str] = None
+    """Nombre de la mesa donde se insertaron los platos"""
+    
+    platos_insertados: Optional[int] = None
+    """Número de platos insertados exitosamente"""
+    
+    logs: List[str] = []
+    """Lista de todos los logs del proceso"""
+    
+    errors: List[str] = []
+    """Lista de todos los errores acumulados durante el proceso"""
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [
+                {
+                    "success": True,
+                    "message": "3 platos insertados correctamente en la mesa J5",
+                    "mesa_nombre": "J5",
+                    "platos_insertados": 3,
+                    "logs": [
+                        "Iniciando inserción de 3 platos en mesa 'J5'",
+                        "Login exitoso",
+                        "Mesa J5 seleccionada",
+                        "Proceso completado - 3/3 platos insertados"
+                    ],
+                    "errors": []
                 }
             ]
         }

@@ -5,10 +5,10 @@ Este módulo implementa los endpoints para consumir datos de productos y mesas
 obtenidos mediante web scraping desde el sistema Domotica INC.
 """
 
-from fastapi import APIRouter, Response, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import APIRouter, Response, WebSocket, WebSocketDisconnect, BackgroundTasks, HTTPException, status
 from typing import Dict, List, Any
 
-from src.model.schemas import ProductoDomotica, MesaDomotica, HealthResponse
+from src.model.schemas import ProductoDomotica, MesaDomotica, HealthResponse, PlatoInsertRequest, PlatoInsertResponse
 from src.service import domotica_service
 from src.service.scheduler_service import SchedulerService
 
@@ -71,6 +71,49 @@ async def obtener_mesas() -> List[MesaDomotica]:
         List[MesaDomotica]: Lista de mesas con su información
     """
     return domotica_service.scrape_and_get_mesas()
+
+
+@router.post("/platos", response_model=PlatoInsertResponse, tags=["Platos"])
+async def insertar_plato(plato_data: PlatoInsertRequest, response: Response, headless: bool = True) -> PlatoInsertResponse:
+    """
+    Inserta platos en una mesa del sistema Domotica.
+    
+    Este endpoint recibe información de una mesa y una lista de platos para insertar:
+    1. Hace login en Domotica INC
+    2. Navega a la sección de Mesas
+    3. Selecciona la mesa específica usando el nombre proporcionado
+    4. Inserta los platos en la mesa
+    5. Llena el comprobante electrónico
+    6. Hace logout
+    7. Devuelve una respuesta con logs completos y errores acumulados
+    
+    Args:
+        plato_data: Información de la mesa y lista de platos a insertar
+        headless: Si True (por defecto), ejecuta sin mostrar navegador. 
+                 Si False, muestra el navegador para debugging
+    
+    Returns:
+        PlatoInsertResponse: Resultado de la operación con logs y errores
+        
+    Status Codes:
+        200: Proceso completado exitosamente sin errores
+        400: Proceso completado pero con errores/warnings
+        500: Error crítico que impidió completar el proceso
+    """
+    result = domotica_service.insertar_plato(plato_data, headless=headless)
+    
+    # Determinar status code basado en el resultado
+    if not result.success:
+        # Error crítico - 500
+        response.status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
+    elif result.errors:
+        # Proceso completado pero con errores/warnings - 400
+        response.status_code = status.HTTP_400_BAD_REQUEST
+    else:
+        # Todo perfecto - 200
+        response.status_code = status.HTTP_200_OK
+    
+    return result
 
 # Conexiones WebSocket activas
 connected_websockets: List[WebSocket] = []

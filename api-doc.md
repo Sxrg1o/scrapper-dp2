@@ -90,3 +90,84 @@ Este evento se envía cada vez que el estado de una o más mesas es actualizado 
       }
     }
     ```
+
+-----
+
+## **Inserción de Platos**
+
+### `POST /api/v1/platos`
+
+Este endpoint permite insertar platos en una mesa específica y generar un comprobante electrónico.
+
+  - **Método:** `POST`
+  - **Content-Type:** `application/json`
+
+#### **Estructura del Request Body**
+
+⚠️ **IMPORTANTE:** El payload DEBE incluir estos 3 campos principales:
+
+1. **`mesa`** (obligatorio): Información de la mesa
+2. **`platos`** (obligatorio): Array de platos a insertar  
+3. **`comprobante`** (obligatorio): Datos para el comprobante electrónico
+
+```json
+{
+  "mesa": {
+    "nombre": "J5",
+    "zona": "ZONA 2",
+    "nota": "JARDIN", 
+    "estado": "ocupada"
+  },
+  "platos": [
+    {
+      "categoria": "CEVICHES",
+      "nombre": "CEVICHE NORTENO",
+      "stock": "1",
+      "precio": "35.00"
+    },
+    {
+      "categoria": "PIQUEOS",
+      "nombre": "CHOROS A LA CHALACA", 
+      "stock": "1",
+      "precio": "30.00"
+    }
+  ],
+  "comprobante": {
+    "tipo_documento": "RUC",
+    "numero_documento": "20123456789",
+    "nombres_completos": "EMPRESA DEMO SAC",
+    "direccion": "AV. LIMA 123 - LIMA",
+    "observacion": "Pedido para mesa J5",
+    "tipo_comprobante": "Factura"
+  }
+}
+```
+
+#### **Campos del Comprobante**
+
+- **`tipo_documento`**: `"RUC"` o `"DNI"`
+- **`numero_documento`**: Número del documento (RUC: 11 dígitos, DNI: 8 dígitos)
+- **`nombres_completos`**: Nombre completo o razón social
+- **`direccion`**: Dirección del cliente
+- **`observacion`**: Observaciones adicionales
+- **`tipo_comprobante`**: `"Factura"` (para RUC) o `"Boleta"` (para DNI)
+
+#### **Respuesta Exitosa (200 OK)**
+
+```json
+{
+  "success": true,
+  "message": "Proceso completado - 2/2 platos insertados en mesa 'J5' - Comprobante llenado exitosamente - Logout exitoso",
+  "mesa_nombre": "J5", 
+  "platos_insertados": 2
+}
+```
+
+#### **Respuesta de Error (400 Bad Request)**
+
+```json
+{
+  "success": false,
+  "message": "Error durante la inserción: [detalle del error]"
+}
+```

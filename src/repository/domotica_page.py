@@ -51,7 +51,7 @@ class DomoticaPage:
         Tiempo máximo de espera para operaciones en el navegador
     """
 
-    def __init__(self, username: Optional[str] = None, password: Optional[str] = None):
+    def __init__(self, username: Optional[str] = None, password: Optional[str] = None, headless: Optional[bool] = None):
         """
         Inicializa la clase DomoticaPage con credenciales y configura el driver.
 
@@ -61,6 +61,9 @@ class DomoticaPage:
             Nombre de usuario para iniciar sesión. Si no se proporciona, se usa el de la configuración.
         password : str, opcional
             Contraseña para iniciar sesión. Si no se proporciona, se usa la de la configuración.
+        headless : bool, opcional
+            Si es True, ejecuta en modo headless. Si es False, muestra el navegador. 
+            Si es None, usa la configuración del debug.
 
         Notes
         -----
@@ -78,9 +81,17 @@ class DomoticaPage:
         # Configurar opciones de Chrome optimizadas para scraping
         chrome_options = Options()
 
+        # Determinar si usar headless
+        use_headless = headless if headless is not None else (not settings.debug)
+        
+        logger.info(f"Configurando Chrome - headless parameter: {headless}, use_headless: {use_headless}")
+        
         # Opciones recomendadas para scraping
-        if not settings.debug:
+        if use_headless:
             chrome_options.add_argument("--headless")
+            logger.info("Chrome configurado en modo headless")
+        else:
+            logger.info("Chrome configurado en modo visible (sin headless)")
 
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
@@ -237,6 +248,725 @@ class DomoticaPage:
             return False
 
         return True
+
+    def select_mesa(self, mesa_nombre: str) -> bool:
+        """
+        Selecciona una mesa específica de la lista de mesas para acceder a sus platos.
+        
+        Args:
+            mesa_nombre: Nombre de la mesa a seleccionar (ej: "J5", "P1", "1", etc.)
+            
+        Returns:
+            bool: True si la mesa fue seleccionada exitosamente, False en caso contrario
+        """
+        try:
+            logger.info(f"Buscando mesa '{mesa_nombre}' en la lista de mesas")
+            
+            # Método 1: Usar el selector específico basado en el HTML proporcionado
+            # Buscar dentro del h2 que contiene el nombre de la mesa
+            try:
+                mesa_element = WebDriverWait(self.driver, 15).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, f"//div[contains(@class, 'v-card') and contains(@class, 'v-card--link') and contains(@class, 'v-sheet') and contains(@class, 'theme--light') and contains(@class, 'elevation-5')]//h2[contains(@class, 'black--text') and normalize-space(text())='{mesa_nombre}']/..")
+                    )
+                )
+                logger.debug(f"Mesa '{mesa_nombre}' encontrada por selector específico de h2")
+            except TimeoutException:
+                # Método 2: Buscar directamente el div que contiene el h2 con el texto de la mesa
+                try:
+                    mesa_element = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, f"//div[contains(@class, 'v-card') and contains(@class, 'v-card--link')]//h2[text()='{mesa_nombre}']/ancestor::div[contains(@class, 'v-card')]")
+                        )
+                    )
+                    logger.debug(f"Mesa '{mesa_nombre}' encontrada por selector de ancestro")
+                except TimeoutException:
+                    # Método 3: Buscar usando el texto directamente en el h2
+                    try:
+                        mesa_element = WebDriverWait(self.driver, 10).until(
+                            EC.element_to_be_clickable(
+                                (By.XPATH, f"//h2[contains(@class, 'black--text') and text()='{mesa_nombre}']")
+                            )
+                        )
+                        logger.debug(f"Mesa '{mesa_nombre}' encontrada por h2 directo")
+                    except TimeoutException:
+                        # Método 4: Buscar el card completo que contiene el texto de la mesa
+                        mesa_element = WebDriverWait(self.driver, 10).until(
+                            EC.element_to_be_clickable(
+                                (By.XPATH, f"//div[contains(@class, 'v-card--link') and .//h2[text()='{mesa_nombre}']]")
+                            )
+                        )
+                        logger.debug(f"Mesa '{mesa_nombre}' encontrada por card que contiene h2")
+            
+            logger.info(f"Mesa '{mesa_nombre}' encontrada, haciendo clic...")
+            mesa_element.click()
+            
+            # Esperar a que cargue la interfaz de la mesa (pueden ser categorías de productos)
+            WebDriverWait(self.driver, self.timeout).until(
+                EC.any_of(
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'v-toolbar__title')]")),
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'v-card v-card--link')]")),
+                    EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'hoverable')]"))
+                )
+            )
+            
+            logger.info(f"Mesa '{mesa_nombre}' seleccionada exitosamente")
+            return True
+            
+        except TimeoutException as e:
+            logger.error(f"Timeout al seleccionar mesa '{mesa_nombre}': {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error al seleccionar mesa '{mesa_nombre}': {str(e)}")
+            return False
+
+    def insert_product_in_search(self, product_name: str) -> bool:
+        """
+        Inserta un nombre de producto en el campo de búsqueda de productos.
+        
+        Args:
+            product_name: Nombre del producto a buscar e insertar
+            
+        Returns:
+            bool: True si el producto fue insertado exitosamente, False en caso contrario
+        """
+        try:
+            # Buscar campo de búsqueda
+            search_input = None
+            
+            # Método 1: Por label "Buscar Productos"
+            try:
+                search_input = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//label[contains(text(), 'Buscar Productos')]/..//input[@type='text']")
+                    )
+                )
+            except TimeoutException:
+                # Método 2: Por v-select__slot
+                try:
+                    search_input = WebDriverWait(self.driver, 10).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//div[contains(@class, 'v-select__slot')]//input[@type='text' and @autocomplete='off']")
+                        )
+                    )
+                except TimeoutException:
+                    # Método 3: Por autofocus
+                    search_input = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//input[@autofocus and @type='text']")
+                        )
+                    )
+            
+            # Llenar campo de búsqueda
+            time.sleep(1)
+            search_input.clear()
+            time.sleep(0.5)
+            search_input.send_keys(product_name)
+            time.sleep(1)
+            
+            # Buscar y hacer clic en el primer resultado
+            result_clicked = False
+            
+            for search_retry in range(3):
+                try:
+                    # Esperar menú de resultados
+                    menu_content = WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//div[contains(@class, 'v-menu__content') and contains(@class, 'menuable__content__active')]")
+                        )
+                    )
+                    
+                    # Hacer clic en primer resultado
+                    first_result = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//div[contains(@class, 'v-menu__content') and contains(@class, 'menuable__content__active')]//div[@role='option' and contains(@class, 'v-list-item')][1]")
+                        )
+                    )
+                    
+                    time.sleep(0.5)
+                    first_result.click()
+                    result_clicked = True
+                    break
+                    
+                except TimeoutException:
+                    if search_retry < 2:
+                        time.sleep(1)
+                        try:
+                            search_input.clear()
+                            time.sleep(0.5)
+                            search_input.send_keys(product_name)
+                            time.sleep(1)
+                        except Exception:
+                            pass
+                except Exception:
+                    if search_retry < 2:
+                        time.sleep(1)
+            
+            # Fallback: presionar Enter si no se pudo hacer clic
+            if not result_clicked:
+                try:
+                    search_input.send_keys(Keys.RETURN)
+                    time.sleep(1)
+                except Exception:
+                    pass
+            
+            # Cerrar popup si aparece
+            try:
+                # Esperar popup
+                WebDriverWait(self.driver, 5).until(
+                    EC.any_of(
+                        EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'v-dialog') and contains(@class, 'v-dialog--active')]")),
+                        EC.presence_of_element_located((By.XPATH, "//div[contains(@class, 'v-overlay--active')]")),
+                        EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'mdi-close')]"))
+                    )
+                )
+                
+                # Buscar botón OK
+                ok_button = None
+                ok_clicked = False
+                
+                try:
+                    ok_button = WebDriverWait(self.driver, 3).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//button[.//span[contains(@class, 'v-btn__content') and text()='OK']]")
+                        )
+                    )
+                except TimeoutException:
+                    try:
+                        ok_button = WebDriverWait(self.driver, 3).until(
+                            EC.element_to_be_clickable(
+                                (By.XPATH, "//span[contains(@class, 'v-btn__content') and text()='OK']")
+                            )
+                        )
+                    except TimeoutException:
+                        try:
+                            ok_button = WebDriverWait(self.driver, 3).until(
+                                EC.element_to_be_clickable(
+                                    (By.XPATH, "//*[contains(text(), 'OK') and (contains(@class, 'v-btn') or self::button)]")
+                                )
+                            )
+                        except TimeoutException:
+                            pass
+                
+                # Hacer clic en OK
+                if ok_button:
+                    for retry in range(3):
+                        if ok_clicked:
+                            break
+                            
+                        time.sleep(1)
+                        
+                        try:
+                            ok_button.click()
+                            ok_clicked = True
+                            break
+                        except Exception:
+                            try:
+                                time.sleep(0.5)
+                                self.driver.execute_script("arguments[0].click();", ok_button)
+                                ok_clicked = True
+                                break
+                            except Exception:
+                                try:
+                                    time.sleep(0.5)
+                                    ok_button.send_keys(Keys.RETURN)
+                                    ok_clicked = True
+                                    break
+                                except Exception:
+                                    pass
+                        
+                        if not ok_clicked and retry < 2:
+                            time.sleep(1)
+                
+                # Fallback: ESC si OK falla
+                if not ok_clicked:
+                    for esc_retry in range(2):
+                        try:
+                            time.sleep(1)
+                            self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                            break
+                        except Exception:
+                            pass
+                
+                time.sleep(0.5)
+                
+            except TimeoutException:
+                pass
+            except Exception:
+                pass
+            
+            return True
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Error insertando producto '{product_name}': {str(e)}")
+            return False
+
+    def open_comprobante_modal(self) -> bool:
+        """
+        Hace clic en el botón mdi-account-plus para abrir el modal de comprobante electrónico.
+        
+        Este método debe llamarse después de insertar todos los platos para abrir 
+        el modal donde se llenarán los datos del comprobante.
+        
+        Returns:
+            bool: True si el modal se abrió exitosamente, False en caso contrario
+        """
+        try:
+            
+            # Buscar el botón con el ícono mdi-account-plus
+            # Basado en el HTML: <button data-v-0e3622d2="" type="button" class="v-icon notranslate v-icon--link mdi mdi-account-plus theme--light black--text" style="font-size: 36px;"></button>
+            comprobante_button = None
+            
+            # Método 1: Buscar directamente por las clases del botón
+            try:
+                comprobante_button = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, "//button[contains(@class, 'mdi-account-plus') and contains(@class, 'v-icon')]")
+                    )
+                )
+                logger.debug("Botón de comprobante encontrado por clases")
+            except TimeoutException:
+                # Método 2: Buscar solo por el ícono mdi-account-plus
+                try:
+                    comprobante_button = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//button[contains(@class, 'mdi-account-plus')]")
+                        )
+                    )
+                    logger.debug("Botón de comprobante encontrado por ícono")
+                except TimeoutException:
+                    # Método 3: Buscar cualquier elemento con mdi-account-plus
+                    comprobante_button = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//*[contains(@class, 'mdi-account-plus')]")
+                        )
+                    )
+                    logger.debug("Botón de comprobante encontrado por elemento genérico")
+            
+            # Hacer clic en el botón con múltiples métodos y retries
+            logger.info("Haciendo clic en botón para abrir modal de comprobante...")
+            button_clicked = False
+            
+            # Retry loop: hasta 3 intentos con sleeps
+            for retry in range(3):
+                if button_clicked:
+                    break
+                    
+                logger.info(f"Intento {retry + 1}/3 de hacer clic en botón comprobante")
+                time.sleep(1)  # Pausa antes de cada intento
+                
+                # Método 1: Clic normal
+                try:
+                    comprobante_button.click()
+                    button_clicked = True
+                    logger.info("Botón de comprobante clickeado exitosamente (clic normal)")
+                    break
+                except Exception as click_error:
+                    logger.warning(f"Clic normal falló (intento {retry + 1}): {click_error}")
+                    
+                    # Método 2: JavaScript click
+                    try:
+                        time.sleep(0.5)
+                        self.driver.execute_script("arguments[0].click();", comprobante_button)
+                        button_clicked = True
+                        logger.info("Botón de comprobante clickeado exitosamente (JavaScript)")
+                        break
+                    except Exception as js_error:
+                        logger.warning(f"JavaScript click falló (intento {retry + 1}): {js_error}")
+                        
+                        # Método 3: Enviar Enter
+                        try:
+                            time.sleep(0.5)
+                            comprobante_button.send_keys(Keys.RETURN)
+                            button_clicked = True
+                            logger.info("Botón de comprobante activado exitosamente (Enter)")
+                            break
+                        except Exception as enter_error:
+                            logger.warning(f"Enter falló (intento {retry + 1}): {enter_error}")
+                
+                # Pausa entre retries si no fue exitoso
+                if not button_clicked and retry < 2:
+                    logger.info(f"Esperando 1 segundo antes del siguiente intento...")
+                    time.sleep(1)
+            
+            if not button_clicked:
+                logger.error("No se pudo hacer clic en el botón de comprobante")
+                return False
+            
+            # Verificar que el modal se haya abierto con retry
+            logger.info("Verificando que el modal de comprobante se haya abierto...")
+            modal_opened = False
+            
+            # Dar tiempo extra para que aparezca el modal
+            time.sleep(0.5)
+            
+            for verify_retry in range(3):
+                try:
+                    WebDriverWait(self.driver, 5).until(
+                        EC.presence_of_element_located(
+                            (By.XPATH, "//h4[contains(text(), 'Datos para Comprobante Electronico')]")
+                        )
+                    )
+                    modal_opened = True
+                    logger.info("Modal de comprobante abierto exitosamente")
+                    break
+                except TimeoutException:
+                    logger.warning(f"Modal no detectado (intento {verify_retry + 1}/3)")
+                    if verify_retry < 2:
+                        time.sleep(2)  # Esperar más tiempo entre intentos
+                        
+            if not modal_opened:
+                logger.error("Modal de comprobante no se abrió después de múltiples intentos")
+                return False
+            
+            return True
+            
+        except TimeoutException as e:
+            logger.error(f"Timeout al abrir modal de comprobante: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"Error al abrir modal de comprobante: {str(e)}")
+            return False
+
+    def fill_comprobante_data(self, comprobante_data: dict) -> bool:
+        """
+        Llena los datos del comprobante electrónico en el modal
+        
+        Args:
+            comprobante_data: Diccionario con los datos del comprobante
+                
+        Returns:
+            bool: True si se llenan los datos correctamente, False en caso contrario
+        """
+        try:
+            logger.info("✅ Verificando modal de comprobante...")
+            
+            # Verificar que el modal está presente
+            modal = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, "//h4[contains(text(), 'Datos para Comprobante Electronico')]")
+                )
+            )
+            
+            # 1. LLENAR TIPO DE DOCUMENTO (solo si no es DNI por defecto)
+            tipo_documento = comprobante_data.get('tipo_documento', 'DNI')
+            if tipo_documento != 'DNI':
+                try:
+                    # Buscar el dropdown de tipo documento en el modal y hacer clic
+                    tipo_doc_dropdown = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, "//div[contains(@class, 'v-dialog')]//div[contains(@class, 'v-select__slot')]"))
+                    )
+                    self.driver.execute_script("arguments[0].click();", tipo_doc_dropdown)
+                    time.sleep(1.5)
+                    
+                    # Seleccionar el tipo de documento correcto
+                    option_xpath = f"//div[contains(@class, 'v-list-item__title') and text()='{tipo_documento}']"
+                    option = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.XPATH, option_xpath))
+                    )
+                    self.driver.execute_script("arguments[0].click();", option)
+                    time.sleep(1)
+                    
+                except Exception as e:
+                    logger.warning(f"⚠️ Error al seleccionar tipo documento: {str(e)}")
+            
+            # 2. LLENAR NÚMERO DE DOCUMENTO
+            numero_documento = str(comprobante_data.get('numero_documento', ''))
+            if numero_documento:
+                try:
+                    time.sleep(1)
+                    
+                    # Buscar inputs con autofocus y type="number" en el modal
+                    numero_inputs = self.driver.find_elements(By.XPATH, "//div[@class='v-dialog v-dialog--active']//input[@autofocus and @type='number']")
+                    
+                    if not numero_inputs:
+                        numero_inputs = self.driver.find_elements(By.XPATH, "//div[@class='v-dialog v-dialog--active']//input[@type='number']")
+                    
+                    if numero_inputs:
+                        numero_input = numero_inputs[0]
+                        
+                        # Hacer scroll, focus y llenar
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", numero_input)
+                        self.driver.execute_script("arguments[0].focus();", numero_input)
+                        numero_input.click()
+                        time.sleep(0.3)
+                        
+                        numero_input.clear()
+                        self.driver.execute_script("arguments[0].value = '';", numero_input)
+                        time.sleep(0.2)
+                        numero_input.send_keys(numero_documento)
+                        time.sleep(0.3)
+                        
+                        # Verificar
+                        valor_actual = numero_input.get_attribute('value')
+                        if valor_actual != numero_documento:
+                            # Intentar con JavaScript
+                            self.driver.execute_script(f"arguments[0].value = '{numero_documento}';", numero_input)
+                            self.driver.execute_script("arguments[0].dispatchEvent(new Event('input'));", numero_input)
+                            
+                    else:
+                        logger.warning("⚠️ Campo número no encontrado")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ Error al llenar número: {str(e)}")
+            
+            # 3-5. LLENAR CAMPOS DE TEXTO EN ORDEN CORRECTO
+            try:
+                # Obtener solo los campos de texto VISIBLES (excluir hidden y readonly)
+                text_inputs = self.driver.find_elements(By.XPATH, 
+                    "//div[@class='v-dialog v-dialog--active']//input[@type='text' and not(@readonly) and not(@hidden)]")
+                
+                # Si no encontramos suficientes, buscar por labels específicos
+                if len(text_inputs) < 3:
+                    nombres_input = None
+                    direccion_input = None 
+                    observacion_input = None
+                    
+                    try:
+                        nombres_input = self.driver.find_element(By.XPATH, "//label[text()='Nombres Completos']/..//input[@type='text']")
+                    except: pass
+                    
+                    try:
+                        direccion_input = self.driver.find_element(By.XPATH, "//label[text()='Direccion']/..//input[@type='text']")
+                    except: pass
+                    
+                    try:
+                        observacion_input = self.driver.find_element(By.XPATH, "//label[text()='Observacion']/..//input[@type='text']")
+                    except: pass
+                    
+                    # Crear lista con los campos encontrados
+                    text_inputs = [inp for inp in [nombres_input, direccion_input, observacion_input] if inp is not None]
+                
+                # Mapeo de campos
+                campos_data = [
+                    ('nombres_completos', 0),
+                    ('direccion', 1), 
+                    ('observacion', 2)
+                ]
+                
+                for campo_key, indice in campos_data:
+                    valor = comprobante_data.get(campo_key, '')
+                    if valor and len(text_inputs) > indice:
+                        try:
+                            campo_input = text_inputs[indice]
+                            
+                            # Hacer scroll y dar focus
+                            self.driver.execute_script("arguments[0].scrollIntoView(true);", campo_input)
+                            self.driver.execute_script("arguments[0].focus();", campo_input)
+                            self.driver.execute_script("arguments[0].click();", campo_input)
+                            time.sleep(0.3)
+                            
+                            # Limpiar y llenar
+                            self.driver.execute_script("arguments[0].value = '';", campo_input)
+                            campo_input.clear()
+                            time.sleep(0.2)
+                            campo_input.send_keys(valor)
+                            time.sleep(0.3)
+                            
+                        except Exception as e:
+                            logger.warning(f"⚠️ Error al llenar {campo_key}: {str(e)}")
+                        
+            except Exception as e:
+                logger.error(f"❌ Error obteniendo campos de texto: {str(e)}")
+            
+            # 6. SELECCIONAR TIPO DE COMPROBANTE
+            tipo_comprobante = comprobante_data.get('tipo_comprobante', 'T')
+            if tipo_comprobante:
+                
+                # Determinar el código correcto (T, B, F)
+                if tipo_comprobante in ['Nota', 'Boleta', 'Factura']:
+                    texto_to_value = {'Nota': 'T', 'Boleta': 'B', 'Factura': 'F'}
+                    codigo_value = texto_to_value[tipo_comprobante]
+                else:
+                    codigo_value = tipo_comprobante
+                    
+                try:
+                    time.sleep(1)
+                    radio_seleccionado = False
+                    
+                    # Método principal: Por texto del label
+                    try:
+                        if tipo_comprobante in ['Nota', 'Boleta', 'Factura']:
+                            texto_label = tipo_comprobante
+                        else:
+                            value_to_texto = {'T': 'Nota', 'B': 'Boleta', 'F': 'Factura'}
+                            texto_label = value_to_texto.get(tipo_comprobante, 'Nota')
+                            
+                        radio_label = WebDriverWait(self.driver, 5).until(
+                            EC.element_to_be_clickable((By.XPATH, f"//div[@role='radiogroup']//label[text()='{texto_label}']"))
+                        )
+                        self.driver.execute_script("arguments[0].click();", radio_label)
+                        radio_seleccionado = True
+                    except Exception as e:
+                        logger.warning(f"⚠️ Error al seleccionar tipo comprobante: {str(e)}")
+                    
+                    # Método de respaldo: JavaScript
+                    if not radio_seleccionado:
+                        try:
+                            js_script = f"""
+                            const radioGroup = document.querySelector('[role="radiogroup"]');
+                            if (radioGroup) {{
+                                const radio = radioGroup.querySelector('input[type="radio"][value="{codigo_value}"]');
+                                if (radio) {{
+                                    radio.checked = true;
+                                    radio.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                                    return true;
+                                }}
+                            }}
+                            return false;
+                            """
+                            result = self.driver.execute_script(js_script)
+                            if result:
+                                radio_seleccionado = True
+                        except Exception as e_js:
+                            logger.warning(f"⚠️ JavaScript falló: {str(e_js)}")
+                    
+                    if not radio_seleccionado:
+                        logger.warning(f"⚠️ No se pudo seleccionar tipo comprobante")
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ Error general al seleccionar tipo comprobante: {str(e)}")
+            
+            # 7. HACER CLIC EN GUARDAR (COMENTADO POR AHORA)
+            # NOTA: Por ahora no queremos que guarde, solo llenar los datos para emular
+            # try:
+            #     guardar_button = WebDriverWait(self.driver, 5).until(
+            #         EC.element_to_be_clickable((By.XPATH, "//button[contains(@class, 'v-btn') and .//span[text()='Guardar']]"))
+            #     )
+            #     self.driver.execute_script("arguments[0].click();", guardar_button)
+            #     time.sleep(3)
+            # except Exception as e:
+            #     logger.warning(f"⚠️ Error al hacer clic en Guardar: {str(e)}")
+            
+            # 8. EN SU LUGAR, HACER CLIC EN EL BOTÓN DE CERRAR (X) CON JAVASCRIPT
+            try:
+                logger.info("💾 Datos llenados, cerrando modal con JavaScript...")
+                time.sleep(2)  # Pausa para que se vean los datos llenados
+                
+                # Script JavaScript para cerrar modal y overlays
+                close_script = """
+                // Función para cerrar modal del comprobante
+                function closeComprobanteModal() {
+                    // Método 1: Buscar y hacer clic en el botón X del modal
+                    const closeButton = document.querySelector('.v-system-bar.theme--dark button.mdi-close');
+                    if (closeButton && closeButton.offsetParent !== null) {
+                        closeButton.click();
+                        console.log('Modal cerrado con botón X');
+                        return true;
+                    }
+                    
+                    // Método 2: Cerrar cualquier dialog activo
+                    const dialogs = document.querySelectorAll('.v-dialog--active');
+                    dialogs.forEach(dialog => {
+                        dialog.style.display = 'none';
+                        dialog.classList.remove('v-dialog--active');
+                    });
+                    if (dialogs.length > 0) {
+                        console.log('Dialogs cerrados manualmente');
+                    }
+                    
+                    // Método 3: Remover overlays activos
+                    const overlays = document.querySelectorAll('.v-overlay--active');
+                    overlays.forEach(overlay => {
+                        overlay.style.display = 'none';
+                        overlay.classList.remove('v-overlay--active');
+                    });
+                    if (overlays.length > 0) {
+                        console.log('Overlays removidos');
+                    }
+                    
+                    // Método 4: Enviar evento ESC
+                    const escEvent = new KeyboardEvent('keydown', {
+                        key: 'Escape',
+                        keyCode: 27,
+                        which: 27,
+                        bubbles: true
+                    });
+                    document.dispatchEvent(escEvent);
+                    console.log('Evento ESC enviado');
+                    
+                    return true;
+                }
+                
+                // Ejecutar cierre
+                return closeComprobanteModal();
+                """
+                
+                # Ejecutar el script JavaScript
+                result = self.driver.execute_script(close_script)
+                logger.info(f"Script ejecutado, resultado: {result}")
+                
+                # Dar tiempo para que se procese el cierre
+                time.sleep(3)
+                
+                # Verificar que el modal se cerró
+                modal_closed = False
+                try:
+                    modals = self.driver.find_elements(
+                        By.XPATH, 
+                        "//h4[contains(text(), 'Datos para Comprobante Electronico')]"
+                    )
+                    overlays = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'v-overlay--active')]")
+                    
+                    if not modals and not overlays:
+                        modal_closed = True
+                        logger.info("✅ Modal cerrado exitosamente con JavaScript")
+                    else:
+                        logger.warning(f"⚠️ Modal aún presente: {len(modals)} modals, {len(overlays)} overlays")
+                        
+                        # Script adicional para forzar limpieza
+                        cleanup_script = """
+                        // Limpieza forzada
+                        const allDialogs = document.querySelectorAll('.v-dialog');
+                        const allOverlays = document.querySelectorAll('.v-overlay');
+                        
+                        allDialogs.forEach(d => {
+                            d.style.display = 'none';
+                            d.remove();
+                        });
+                        
+                        allOverlays.forEach(o => {
+                            o.style.display = 'none';
+                            o.remove();
+                        });
+                        
+                        // Limpiar clases del body
+                        document.body.classList.remove('v-overlay-scroll-blocked');
+                        
+                        return 'cleaned';
+                        """
+                        
+                        cleanup_result = self.driver.execute_script(cleanup_script)
+                        logger.info(f"Limpieza forzada ejecutada: {cleanup_result}")
+                        modal_closed = True
+                        
+                except Exception as verify_err:
+                    logger.warning(f"Error verificando cierre: {verify_err}")
+                    modal_closed = True  # Asumir que se cerró
+                
+            except Exception as e:
+                logger.warning(f"⚠️ Error con JavaScript: {str(e)}")
+                # Fallback: ESC con Selenium
+                try:
+                    logger.info("Fallback: usando ESC con Selenium...")
+                    for _ in range(5):
+                        self.driver.find_element(By.TAG_NAME, "body").send_keys(Keys.ESCAPE)
+                        time.sleep(1)
+                    logger.info("✅ Fallback ESC ejecutado")
+                except Exception as esc_err:
+                    logger.warning(f"⚠️ Error con fallback ESC: {str(esc_err)}")
+            
+            # Pausa final para estabilizar la UI
+            time.sleep(2)
+            
+            return True
+            
+        except TimeoutException as e:
+            logger.error(f"❌ Timeout: Modal de comprobante no encontrado: {str(e)}")
+            return False
+        except Exception as e:
+            logger.error(f"❌ Error llenando datos del comprobante: {str(e)}")
+            return False
 
     @contextmanager
     def _open_mesas_modal(self) -> Iterator[None]:
@@ -748,17 +1478,105 @@ class DomoticaPage:
             Estado de la operación: "logout_success" si es exitoso, o mensaje de error.
         """
         try:
-            menu_btn = WebDriverWait(self.driver, self.timeout).until(
-                EC.element_to_be_clickable(
-                    (
-                        By.XPATH,
-                        '//span[contains(@class, "v-btn__content")]/i[contains(@class, "mdi-menu")]',
+            logger.info("Iniciando proceso de logout...")
+            
+            # PASO 1: Cerrar todos los overlays y modales que puedan estar abiertos
+            overlay_closed = False
+            for attempt in range(3):  # Hasta 3 intentos para cerrar overlays
+                try:
+                    # Verificar si hay overlays activos
+                    overlays = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'v-overlay--active')]")
+                    if not overlays:
+                        logger.debug("No hay overlays activos")
+                        overlay_closed = True
+                        break
+                        
+                    logger.info(f"Overlay detectado (intento {attempt + 1}/3), intentando cerrarlo...")
+                    
+                    # Método 1: Buscar botón X/close en cualquier modal
+                    close_buttons = self.driver.find_elements(By.XPATH, 
+                        "//button[contains(@class, 'mdi-close')] | //i[contains(@class, 'mdi-close')] | //*[contains(@class, 'close')]")
+                    
+                    if close_buttons:
+                        try:
+                            close_buttons[0].click()
+                            logger.debug("Botón de cerrar clickeado")
+                            time.sleep(1)
+                            continue
+                        except Exception as close_err:
+                            logger.warning(f"Error al hacer clic en botón cerrar: {close_err}")
+                    
+                    # Método 2: Presionar ESC múltiples veces
+                    logger.debug("Presionando ESC para cerrar modales...")
+                    body = self.driver.find_element(By.TAG_NAME, "body")
+                    for _ in range(3):
+                        body.send_keys(Keys.ESCAPE)
+                        time.sleep(0.5)
+                    
+                    # Método 3: Hacer clic fuera del modal (en el overlay)
+                    try:
+                        overlay_scrim = self.driver.find_element(By.XPATH, "//div[contains(@class, 'v-overlay__scrim')]")
+                        self.driver.execute_script("arguments[0].click();", overlay_scrim)
+                        logger.debug("Clic en overlay scrim")
+                        time.sleep(1)
+                    except Exception as scrim_err:
+                        logger.warning(f"Error al hacer clic en overlay: {scrim_err}")
+                    
+                except Exception as overlay_err:
+                    logger.warning(f"Error al cerrar overlay (intento {attempt + 1}): {overlay_err}")
+                
+                time.sleep(1)  # Esperar entre intentos
+            
+            # PASO 2: Esperar a que la interfaz se estabilice
+            if not overlay_closed:
+                logger.warning("No se pudieron cerrar todos los overlays, intentando logout de todos modos...")
+            
+            # Esperar a que no haya overlays activos o timeout después de 10 segundos (aumentado)
+            try:
+                WebDriverWait(self.driver, 10).until(
+                    lambda d: len(d.find_elements(By.XPATH, "//div[contains(@class, 'v-overlay--active')]")) == 0
+                )
+                logger.debug("Interfaz estabilizada sin overlays")
+            except TimeoutException:
+                logger.warning("Timeout esperando que se cierren los overlays, continuando...")
+                # Último intento: hacer clic en el fondo para cerrar cualquier modal
+                try:
+                    self.driver.execute_script("document.body.click();")
+                    time.sleep(2)
+                except Exception:
+                    pass
+            
+            # Ahora intentar hacer clic en el menú hamburguesa
+            logger.debug("Buscando menú hamburguesa...")
+            
+            # Método 1: Buscar por el ícono mdi-menu
+            try:
+                menu_btn = WebDriverWait(self.driver, 10).until(
+                    EC.element_to_be_clickable(
+                        (By.XPATH, '//i[contains(@class, "mdi-menu")]')
                     )
                 )
-            )
-            menu_btn.click()
-            logger.debug("Menú hamburguesa clickeado")
+                menu_btn.click()
+                logger.debug("Menú hamburguesa clickeado (método 1)")
+            except TimeoutException:
+                # Método 2: Usar JavaScript para hacer clic
+                try:
+                    menu_btn = self.driver.find_element(
+                        By.XPATH, '//i[contains(@class, "mdi-menu")]'
+                    )
+                    self.driver.execute_script("arguments[0].click();", menu_btn)
+                    logger.debug("Menú hamburguesa clickeado con JavaScript (método 2)")
+                except Exception as js_err:
+                    # Método 3: Buscar por el span padre
+                    menu_btn = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, '//span[contains(@class, "v-btn__content")]/i[contains(@class, "mdi-menu")]/..')
+                        )
+                    )
+                    menu_btn.click()
+                    logger.debug("Menú hamburguesa clickeado (método 3)")
 
+            # Esperar a que aparezca el menú desplegable y hacer clic en "Cerrar Sesion"
             logout_btn = WebDriverWait(self.driver, self.timeout).until(
                 EC.element_to_be_clickable(
                     (
@@ -770,6 +1588,7 @@ class DomoticaPage:
             logout_btn.click()
             logger.info("Logout exitoso")
             return "logout_success"
+            
         except Exception as logout_err:
             error_msg = f"logout_error: {logout_err}"
             logger.error(error_msg)
