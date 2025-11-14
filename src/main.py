@@ -85,6 +85,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         debug=settings.debug,
         lifespan=lifespan,
+        root_path="/api",
     )
 
     # Agregar middleware CORS
@@ -98,7 +99,7 @@ def create_app() -> FastAPI:
 
     from src.api.controllers.domotica_controller import router as domotica_router
 
-    app.include_router(domotica_router, prefix="/api/v1")
+    app.include_router(domotica_router, prefix="/v1")
 
     @app.post("/sync/platos", tags=["Sync"])
     async def sync_platos(response: Response):
