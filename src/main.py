@@ -85,7 +85,7 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         debug=settings.debug,
         lifespan=lifespan,
-        root_path="/api",
+        root_path="/scrapper",
     )
 
     # Agregar middleware CORS
