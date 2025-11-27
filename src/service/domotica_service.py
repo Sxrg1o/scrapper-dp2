@@ -10,12 +10,75 @@ import time
 from typing import List
 import io
 import sys
+import asyncio
+import aio_pika
+import json
 
 from src.repository.domotica_page import DomoticaPage
 from src.model.schemas import ProductoDomotica, MesaDomotica, PlatoInsertRequest, PlatoInsertResponse
+from src.core.config import get_settings
 
 # Configurar logging
 logger = logging.getLogger(__name__)
+settings = get_settings()
+
+
+async def publish_screenshot_to_rabbitmq(screenshot_base64: str):
+    """
+    Publica el screenshot en base64 a una cola de RabbitMQ dedicada.
+    
+    Args:
+        screenshot_base64: Imagen en formato base64
+    """
+    if not screenshot_base64:
+        logger.warning("No hay screenshot para publicar")
+        return
+        
+    try:
+        rabbitmq_url = f"amqp://{settings.rabbitmq_user}:{settings.rabbitmq_password}@{settings.rabbitmq_host}:{settings.rabbitmq_port}/{settings.rabbitmq_vhost}"
+        
+        # Conectar a RabbitMQ
+        connection = await aio_pika.connect_robust(rabbitmq_url)
+        channel = await connection.channel()
+        
+        # Declarar Exchange para screenshots
+        exchange = await channel.declare_exchange(
+            settings.rabbitmq_screenshot_exchange,
+            type="topic",
+            durable=True
+        )
+        
+        # Declarar Cola para screenshots
+        queue = await channel.declare_queue(
+            settings.rabbitmq_screenshot_queue,
+            durable=True
+        )
+        
+        # Bind queue al exchange
+        await queue.bind(exchange, routing_key="screenshot.#")
+        
+        # Crear mensaje con el screenshot
+        message_body = json.dumps({
+            "screenshot": screenshot_base64,
+            "timestamp": time.time()
+        })
+        
+        # Publicar mensaje
+        await exchange.publish(
+            aio_pika.Message(
+                body=message_body.encode(),
+                delivery_mode=aio_pika.DeliveryMode.PERSISTENT
+            ),
+            routing_key="screenshot.comprobante"
+        )
+        
+        logger.info(f"📸 Screenshot publicado a RabbitMQ ({len(screenshot_base64)} caracteres)")
+        
+        # Cerrar conexión
+        await connection.close()
+        
+    except Exception as e:
+        logger.error(f"❌ Error publicando screenshot a RabbitMQ: {e}")
 
 
 class LogCapture:
@@ -135,7 +198,8 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
                     success=False,
                     message="Error al hacer login en Domotica",
                     logs=log_capture.logs,
-                    errors=log_capture.errors
+                    errors=log_capture.errors,
+                    screenshot=screenshot_base64
                 )
             
             log_capture.add_log("Login exitoso, navegando a sección de Mesas...")
@@ -147,7 +211,8 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
                     success=False,
                     message="Error al navegar a la sección de Mesas",
                     logs=log_capture.logs,
-                    errors=log_capture.errors
+                    errors=log_capture.errors,
+                    screenshot=screenshot_base64
                 )
             
             log_capture.add_log(f"Seleccionando mesa '{mesa_nombre}'...")
@@ -159,7 +224,8 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
                     success=False,
                     message=f"Error al seleccionar la mesa '{mesa_nombre}'",
                     logs=log_capture.logs,
-                    errors=log_capture.errors
+                    errors=log_capture.errors,
+                    screenshot=screenshot_base64
                 )
             
             log_capture.add_log(f"Mesa '{mesa_nombre}' seleccionada. Iniciando inserción de {num_platos} platos...")
@@ -211,12 +277,28 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
                         'tipo_comprobante': plato_data.comprobante.tipo_comprobante.value
                     }
                     
-                    comprobante_success = domotica.fill_comprobante_data(comprobante_data)
+                    comprobante_result = domotica.fill_comprobante_data(comprobante_data)
+                    comprobante_success = comprobante_result["success"]
                     
                     if comprobante_success:
                         log_capture.add_log("Datos del comprobante llenados exitosamente")
+                        # Guardar screenshot si está disponible
+                        screenshot_base64 = comprobante_result.get("screenshot", "")
+                        
+                        # Publicar screenshot a RabbitMQ
+                        if screenshot_base64:
+                            try:
+                                # Ejecutar la publicación asíncrona desde contexto síncrono
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                loop.run_until_complete(publish_screenshot_to_rabbitmq(screenshot_base64))
+                                loop.close()
+                                log_capture.add_log("Screenshot enviado a cola de RabbitMQ")
+                            except Exception as pub_err:
+                                log_capture.add_warning(f"Error al publicar screenshot: {pub_err}")
                     else:
                         log_capture.add_warning("No se pudieron llenar los datos del comprobante")
+                        screenshot_base64 = ""
                         
             except AttributeError as attr_ex:
                 log_capture.add_warning(f"Error de atributo en comprobante: {str(attr_ex)}")
@@ -253,7 +335,8 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
                     mesa_nombre=mesa_nombre,
                     platos_insertados=platos_insertados,
                     logs=log_capture.logs,
-                    errors=log_capture.errors
+                    errors=log_capture.errors,
+                    screenshot=screenshot_base64
                 )
             
             return PlatoInsertResponse(
@@ -262,7 +345,8 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
                 mesa_nombre=mesa_nombre,
                 platos_insertados=platos_insertados,
                 logs=log_capture.logs,
-                errors=log_capture.errors
+                errors=log_capture.errors,
+                screenshot=screenshot_base64
             )
             
     except Exception as e:
@@ -272,5 +356,6 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
             success=False,
             message=error_msg,
             logs=[f"Iniciando inserción de {num_platos} platos en mesa '{mesa_nombre}'", f"ERROR: {error_msg}"],
-            errors=[error_msg]
+            errors=[error_msg],
+            screenshot=""
         )

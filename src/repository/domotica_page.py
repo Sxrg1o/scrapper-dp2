@@ -5,6 +5,7 @@ Este módulo proporciona una interfaz para automatizar la navegación y scraping
 del sitio web de Domotica Perú utilizando Selenium y BeautifulSoup.
 """
 
+import base64
 import logging
 import re
 import time
@@ -772,7 +773,7 @@ class DomoticaPage:
             logger.error(f"Error al abrir modal de comprobante: {str(e)}")
             return False
 
-    def fill_comprobante_data(self, comprobante_data: dict) -> bool:
+    def fill_comprobante_data(self, comprobante_data: dict) -> dict:
         """
         Llena los datos del comprobante electrónico en el modal
         
@@ -780,7 +781,9 @@ class DomoticaPage:
             comprobante_data: Diccionario con los datos del comprobante
                 
         Returns:
-            bool: True si se llenan los datos correctamente, False en caso contrario
+            dict: Diccionario con las claves:
+                - success (bool): True si se llenaron los datos correctamente
+                - screenshot (str): Imagen en base64 de la pantalla después de llenar los datos
         """
         try:
             logger.info("✅ Verificando modal de comprobante...")
@@ -1043,6 +1046,16 @@ class DomoticaPage:
                 # Dar tiempo para que se procese el cierre
                 time.sleep(3)
                 
+                # Capturar pantalla y convertir a base64
+                screenshot_base64 = ""
+                try:
+                    logger.info("📸 Capturando pantalla...")
+                    screenshot_png = self.driver.get_screenshot_as_png()
+                    screenshot_base64 = base64.b64encode(screenshot_png).decode('utf-8')
+                    logger.info(f"✅ Captura realizada exitosamente ({len(screenshot_base64)} caracteres en base64)")
+                except Exception as screenshot_err:
+                    logger.error(f"❌ Error al capturar pantalla: {screenshot_err}")
+
                 # Verificar que el modal se cerró
                 modal_closed = False
                 try:
@@ -1103,14 +1116,17 @@ class DomoticaPage:
             # Pausa final para estabilizar la UI
             time.sleep(2)
             
-            return True
+            return {
+                "success": True,
+                "screenshot": screenshot_base64
+            }
             
         except TimeoutException as e:
             logger.error(f"❌ Timeout: Modal de comprobante no encontrado: {str(e)}")
-            return False
+            return {"success": False, "screenshot": ""}
         except Exception as e:
             logger.error(f"❌ Error llenando datos del comprobante: {str(e)}")
-            return False
+            return {"success": False, "screenshot": ""}
 
     @contextmanager
     def _open_mesas_modal(self) -> Iterator[None]:

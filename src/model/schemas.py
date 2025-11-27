@@ -301,6 +301,9 @@ class PlatoInsertResponse(BaseModel):
     
     errors: List[str] = []
     """Lista de todos los errores acumulados durante el proceso"""
+    
+    screenshot: Optional[str] = None
+    """Captura de pantalla en base64 después de llenar los datos del comprobante"""
 
     model_config = {
         "json_schema_extra": {
@@ -316,7 +319,8 @@ class PlatoInsertResponse(BaseModel):
                         "Mesa J5 seleccionada",
                         "Proceso completado - 3/3 platos insertados"
                     ],
-                    "errors": []
+                    "errors": [],
+                    "screenshot": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
                 }
             ]
         }

@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     rabbitmq_vhost: str = "prod_vhost"
     rabbitmq_exchange: str = "domotica_exchange"
     rabbitmq_queue: str = "domotica_queue"
+    rabbitmq_screenshot_exchange: str = "domotica_exchange_screenshot"
+    rabbitmq_screenshot_queue: str = "domotica_queue_screenshot"
 
     # Eliminamos los field_validators que estaban causando problemas
 
