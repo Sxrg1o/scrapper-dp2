@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.core.config import get_settings
 from src.core.logging import configure_logging
 from src.service.scheduler_service import SchedulerService
+from src.core.rabbitmq_consumer import RabbitMQConsumer
 
 
 # Configurar logger para este módulo
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 # Crear instancia del scheduler service
 scheduler = SchedulerService()
+rabbitmq_consumer = RabbitMQConsumer()
 
 
 @asynccontextmanager
@@ -47,6 +49,10 @@ async def lifespan(app: FastAPI):
     else:
         logger.error("No se pudo iniciar el servicio de sincronización")
 
+    # Iniciar RabbitMQ Consumer
+    logger.info("Iniciando RabbitMQ Consumer...")
+    await rabbitmq_consumer.connect()
+
     logger.info("Domotica Scrapper API iniciada correctamente")
 
     yield  # Aplicación en funcionamiento
@@ -58,6 +64,9 @@ async def lifespan(app: FastAPI):
     if scheduler.is_running:
         logger.info("Deteniendo el servicio de sincronización...")
         scheduler.stop()
+
+    # Cerrar RabbitMQ Consumer
+    await rabbitmq_consumer.close()
 
     # Aquí se pueden cerrar otras conexiones y liberar recursos
     logger.info("Recursos liberados correctamente")

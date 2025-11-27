@@ -94,6 +94,15 @@ class Settings(BaseSettings):
     default_page_size: int = 20
     max_page_size: int = 100
 
+    # RabbitMQ
+    rabbitmq_host: str = "localhost"
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = "prod_user"
+    rabbitmq_password: str = "prod_password"
+    rabbitmq_vhost: str = "prod_vhost"
+    rabbitmq_exchange: str = "domotica_exchange"
+    rabbitmq_queue: str = "domotica_queue"
+
     # Eliminamos los field_validators que estaban causando problemas
 
 
