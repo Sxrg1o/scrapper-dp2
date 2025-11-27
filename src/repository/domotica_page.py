@@ -87,12 +87,11 @@ class DomoticaPage:
         
         logger.info(f"Configurando Chrome - headless parameter: {headless}, use_headless: {use_headless}")
         
-        # # Opciones recomendadas para scraping
-        # if use_headless:
-        #     chrome_options.add_argument("--headless")
-        #     logger.info("Chrome configurado en modo headless")
-        # else:
-        #     logger.info("Chrome configurado en modo visible (sin headless)")
+        if use_headless:
+            chrome_options.add_argument("--headless")
+            logger.info("Chrome configurado en modo headless")
+        else:
+            logger.info("Chrome configurado en modo visible (sin headless)")
 
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
@@ -101,6 +100,7 @@ class DomoticaPage:
         chrome_options.add_argument("--disable-notifications")
         chrome_options.add_argument("--disable-infobars")
         chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--window-size=1920,1080")
 
         # Inicializar el driver
         logger.info(f"Inicializando WebDriver para {self.base_url}")
@@ -785,6 +785,7 @@ class DomoticaPage:
                 - success (bool): True si se llenaron los datos correctamente
                 - screenshot (str): Imagen en base64 de la pantalla después de llenar los datos
         """
+        screenshot_base64 = ""
         try:
             logger.info("✅ Verificando modal de comprobante...")
             
@@ -1050,11 +1051,16 @@ class DomoticaPage:
                 screenshot_base64 = ""
                 try:
                     logger.info("📸 Capturando pantalla...")
+                    # Redimensionar ventana para asegurar buena resolución
+                    self.driver.set_window_size(1920, 1080)
+                    time.sleep(0.5)
+                    
                     screenshot_png = self.driver.get_screenshot_as_png()
                     screenshot_base64 = base64.b64encode(screenshot_png).decode('utf-8')
                     logger.info(f"✅ Captura realizada exitosamente ({len(screenshot_base64)} caracteres en base64)")
                 except Exception as screenshot_err:
                     logger.error(f"❌ Error al capturar pantalla: {screenshot_err}")
+                    screenshot_base64 = "" # Ensure it's assigned even on error
 
                 # Verificar que el modal se cerró
                 modal_closed = False

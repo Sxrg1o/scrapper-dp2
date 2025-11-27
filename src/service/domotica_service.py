@@ -44,7 +44,7 @@ async def publish_screenshot_to_rabbitmq(screenshot_base64: str):
         # Declarar Exchange para screenshots
         exchange = await channel.declare_exchange(
             settings.rabbitmq_screenshot_exchange,
-            type="topic",
+            type="fanout",
             durable=True
         )
         
@@ -184,6 +184,9 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
     # Crear capturador de logs
     log_capture = LogCapture()
     log_capture.add_log(f"Iniciando inserción de {num_platos} platos en mesa '{mesa_nombre}' (headless: {headless})")
+    
+    # Inicializar variable de screenshot
+    screenshot_base64 = ""
     
     try:
         # Crear instancia de DomoticaPage con el modo headless especificado
