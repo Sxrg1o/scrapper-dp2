@@ -167,12 +167,18 @@ def insertar_plato(plato_data: PlatoInsertRequest, headless: bool = True) -> Pla
             platos_insertados = 0
             for plato in plato_data.platos:
                 try:
-                    # Insertar el producto en el campo de búsqueda
-                    insert_success = domotica.insert_product_in_search(plato.nombre)
+                    # Insertar el producto en el campo de búsqueda con su cantidad (stock) y comentario
+                    cantidad_str = str(plato.stock) if hasattr(plato, 'stock') and plato.stock else "1"
+                    comentario_str = plato.comentario if hasattr(plato, 'comentario') and plato.comentario else ""
+                    insert_success = domotica.insert_product_in_search(plato.nombre, cantidad_str, comentario_str)
                     
                     if insert_success:
                         platos_insertados += 1
-                        log_capture.add_log(f"Plato '{plato.nombre}' insertado exitosamente ({platos_insertados}/{num_platos})")
+                        log_msg = f"Plato '{plato.nombre}' insertado exitosamente con cantidad {cantidad_str}"
+                        if comentario_str:
+                            log_msg += f" y comentario '{comentario_str}'"
+                        log_msg += f" ({platos_insertados}/{num_platos})"
+                        log_capture.add_log(log_msg)
                     else:
                         log_capture.add_warning(f"Error al insertar plato '{plato.nombre}'")
                         

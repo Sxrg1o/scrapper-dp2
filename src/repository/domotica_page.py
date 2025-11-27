@@ -86,12 +86,12 @@ class DomoticaPage:
         
         logger.info(f"Configurando Chrome - headless parameter: {headless}, use_headless: {use_headless}")
         
-        # Opciones recomendadas para scraping
-        if use_headless:
-            chrome_options.add_argument("--headless")
-            logger.info("Chrome configurado en modo headless")
-        else:
-            logger.info("Chrome configurado en modo visible (sin headless)")
+        # # Opciones recomendadas para scraping
+        # if use_headless:
+        #     chrome_options.add_argument("--headless")
+        #     logger.info("Chrome configurado en modo headless")
+        # else:
+        #     logger.info("Chrome configurado en modo visible (sin headless)")
 
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
@@ -300,7 +300,60 @@ class DomoticaPage:
             
             logger.info(f"Mesa '{mesa_nombre}' encontrada, haciendo clic...")
             mesa_element.click()
-            
+
+            # Buscar y hacer clic en el botón "Editar" si aparece
+            try:
+                logger.debug("Buscando botón 'Editar'...")
+                
+                # Buscar elemento que contenga el texto "Editar"
+                editar_element = None
+                
+                # Método 1: Buscar cualquier elemento que contenga "Editar" en el texto
+                try:
+                    editar_element = WebDriverWait(self.driver, 1).until(
+                        EC.element_to_be_clickable(
+                            (By.XPATH, "//*[contains(text(), 'Editar')]")
+                        )
+                    )
+                    logger.debug("Botón 'Editar' encontrado por texto genérico")
+                except TimeoutException:
+                    # Método 2: Buscar específicamente en botones
+                    try:
+                        editar_element = WebDriverWait(self.driver, 1).until(
+                            EC.element_to_be_clickable(
+                                (By.XPATH, "//button[contains(text(), 'Editar')]")
+                            )
+                        )
+                        logger.debug("Botón 'Editar' encontrado en button")
+                    except TimeoutException:
+                        # Método 3: Buscar en divs o spans que puedan actuar como botón
+                        try:
+                            editar_element = WebDriverWait(self.driver, 1).until(
+                                EC.element_to_be_clickable(
+                                    (By.XPATH, "//div[contains(text(), 'Editar')] | //span[contains(text(), 'Editar')]")
+                                )
+                            )
+                            logger.debug("Botón 'Editar' encontrado en div/span")
+                        except TimeoutException:
+                            logger.debug("No se encontró botón 'Editar' - continuando sin hacer clic")
+                
+                # Si se encontró el elemento, hacer clic
+                if editar_element:
+                    logger.info("Haciendo clic en botón 'Editar'...")
+                    try:
+                        editar_element.click()
+                        logger.info("Clic en 'Editar' exitoso")
+                    except Exception as click_err:
+                        # Intentar con JavaScript si el clic normal falla
+                        try:
+                            self.driver.execute_script("arguments[0].click();", editar_element)
+                            logger.info("Clic en 'Editar' exitoso con JavaScript")
+                        except Exception as js_err:
+                            logger.warning(f"No se pudo hacer clic en 'Editar': {js_err}")
+                            
+            except Exception as editar_err:
+                logger.debug(f"No se encontró o no se pudo hacer clic en 'Editar': {editar_err}")
+
             # Esperar a que cargue la interfaz de la mesa (pueden ser categorías de productos)
             WebDriverWait(self.driver, self.timeout).until(
                 EC.any_of(
@@ -320,12 +373,14 @@ class DomoticaPage:
             logger.error(f"Error al seleccionar mesa '{mesa_nombre}': {str(e)}")
             return False
 
-    def insert_product_in_search(self, product_name: str) -> bool:
+    def insert_product_in_search(self, product_name: str, cantidad: str = "1", comentario: str = "RPA") -> bool:
         """
         Inserta un nombre de producto en el campo de búsqueda de productos.
         
         Args:
             product_name: Nombre del producto a buscar e insertar
+            cantidad: Cantidad del producto a insertar (por defecto "1")
+            comentario: Comentario u observación para el producto (por defecto "")
             
         Returns:
             bool: True si el producto fue insertado exitosamente, False en caso contrario
@@ -420,6 +475,95 @@ class DomoticaPage:
                         EC.presence_of_element_located((By.XPATH, "//button[contains(@class, 'mdi-close')]"))
                     )
                 )
+                
+                # Llenar el campo de Observacion (textarea)
+                try:
+                    logger.debug("Buscando campo de Observacion (textarea)...")
+                    time.sleep(1)
+                    
+                    # Buscar textarea con label "Observacion" en el popup activo
+                    observacion_textareas = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'v-dialog--active')]//label[text()='Observacion']/following-sibling::textarea")
+                    
+                    if not observacion_textareas:
+                        observacion_textareas = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'v-dialog--active')]//textarea")
+                    
+                    if observacion_textareas:
+                        observacion_textarea = observacion_textareas[0]
+                        comentario_a_usar = comentario if comentario else ""
+                        logger.info(f"Campo de Observacion encontrado, llenando con: '{comentario_a_usar}'")
+                        
+                        # Hacer scroll, focus y llenar
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", observacion_textarea)
+                        self.driver.execute_script("arguments[0].focus();", observacion_textarea)
+                        observacion_textarea.click()
+                        time.sleep(0.3)
+                        
+                        observacion_textarea.clear()
+                        self.driver.execute_script("arguments[0].value = '';", observacion_textarea)
+                        time.sleep(0.2)
+                        observacion_textarea.send_keys(comentario_a_usar)
+                        time.sleep(0.3)
+                        
+                        # Verificar que se llenó correctamente
+                        valor_actual = observacion_textarea.get_attribute('value')
+                        if valor_actual == comentario_a_usar:
+                            logger.info(f"✅ Campo de Observacion llenado exitosamente con: '{comentario_a_usar}'")
+                        else:
+                            # Intentar con JavaScript si no funcionó
+                            logger.debug("Intentando llenar Observacion con JavaScript...")
+                            self.driver.execute_script(f"arguments[0].value = '{comentario_a_usar}';", observacion_textarea)
+                            self.driver.execute_script("arguments[0].dispatchEvent(new Event('input'));", observacion_textarea)
+                            logger.info(f"✅ Campo de Observacion llenado con JavaScript: '{comentario_a_usar}'")
+                            
+                    else:
+                        logger.debug("No se encontró campo de Observacion - puede no ser necesario")
+                        
+                except Exception as observacion_err:
+                    logger.warning(f"⚠️ Error al llenar campo de Observacion: {observacion_err}")
+                
+                # Llenar el campo de cantidad (input type="number")
+                try:
+                    logger.debug("Buscando campo de cantidad (type='number')...")
+                    time.sleep(1)
+                    
+                    # Buscar inputs con autofocus y type="number" en el popup activo
+                    cantidad_inputs = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'v-dialog--active')]//input[@autofocus and @type='number']")
+                    
+                    if not cantidad_inputs:
+                        cantidad_inputs = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'v-dialog--active')]//input[@type='number']")
+                    
+                    if cantidad_inputs:
+                        cantidad_input = cantidad_inputs[0]
+                        logger.info(f"Campo de cantidad encontrado, llenando con valor: {cantidad}")
+                        
+                        # Hacer scroll, focus y llenar (igual que número de documento)
+                        self.driver.execute_script("arguments[0].scrollIntoView(true);", cantidad_input)
+                        self.driver.execute_script("arguments[0].focus();", cantidad_input)
+                        cantidad_input.click()
+                        time.sleep(0.3)
+                        
+                        cantidad_input.clear()
+                        self.driver.execute_script("arguments[0].value = '';", cantidad_input)
+                        time.sleep(0.2)
+                        cantidad_input.send_keys(cantidad)
+                        time.sleep(0.3)
+                        
+                        # Verificar que se llenó correctamente
+                        valor_actual = cantidad_input.get_attribute('value')
+                        if valor_actual == cantidad:
+                            logger.info(f"✅ Campo de cantidad llenado exitosamente con valor: {cantidad}")
+                        else:
+                            # Intentar con JavaScript si no funcionó
+                            logger.debug("Intentando llenar con JavaScript...")
+                            self.driver.execute_script(f"arguments[0].value = '{cantidad}';", cantidad_input)
+                            self.driver.execute_script("arguments[0].dispatchEvent(new Event('input'));", cantidad_input)
+                            logger.info(f"✅ Campo de cantidad llenado con JavaScript: {cantidad}")
+                            
+                    else:
+                        logger.debug("No se encontró campo de cantidad - puede no ser necesario")
+                        
+                except Exception as cantidad_err:
+                    logger.warning(f"⚠️ Error al llenar campo de cantidad: {cantidad_err}")
                 
                 # Buscar botón OK
                 ok_button = None
